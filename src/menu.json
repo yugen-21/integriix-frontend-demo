@@ -1,0 +1,37 @@
+[
+  {
+    "name": "Daily Brief",
+    "url": "/daily-brief",
+    "icon": "FaRegNewspaper"
+  },
+  {
+    "name": "Financials",
+    "url": "/financials",
+    "icon": "FaSackDollar"
+  },
+  {
+    "name": "Safety and Compliance",
+    "url": "/safety-and-compliance",
+    "icon": "FaShieldHalved"
+  },
+  {
+    "name": "Operations",
+    "url": "/operations",
+    "icon": "FaChartLine"
+  },
+  {
+    "name": "Audits",
+    "url": "/audits",
+    "icon": "FaClipboardCheck"
+  },
+  {
+    "name": "Patient Experience",
+    "url": "/patient-experience",
+    "icon": "FaRegHospital"
+  },
+  {
+    "name": "Settings",
+    "url": "/settings",
+    "icon": "FaGear"
+  }
+]

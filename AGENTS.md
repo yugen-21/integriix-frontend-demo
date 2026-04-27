@@ -84,14 +84,6 @@ For the MVP, only **Daily Brief** needs to be active.
 
 Create a top header for the daily brief page.
 
-Header should include:
-
-- Page title: `C-Suite Daily Brief`
-- Date: current date or mock date
-- Hospital name: example `Al Noor Medical Center`
-- Status badge: `Moderate Risk`, `Stable`, or `Action Needed`
-- Optional user profile area: `Chief Quality Officer`
-
 ### 3. Main Content Base
 
 Create the main content container with a clean grid layout.
