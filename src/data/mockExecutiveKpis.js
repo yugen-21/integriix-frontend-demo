@@ -5,7 +5,7 @@ export const mockExecutiveKpis = [
     value: "82",
     trend: "-4 vs yesterday",
     trendDirection: "down",
-    status: "Elevated Watch",
+    status: "Moderate Risk",
     description: "Composite view of safety, compliance, operational, and financial governance signals.",
     sourceCategory: "Audit & Compliance Data",
   },

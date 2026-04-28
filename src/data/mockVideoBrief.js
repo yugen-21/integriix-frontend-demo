@@ -4,7 +4,7 @@ export const mockVideoBrief = {
   generatedAt: "2026-04-27T07:15:00+05:30",
   status: "Ready",
   executiveSummary:
-    "Riverside begins the day with stable core operations but elevated governance risk across medication safety, infection control, claims denials, and discharge throughput.",
+    "Riverside begins the day with stable core operations but moderate governance risk across medication safety, infection control, claims denials, and discharge throughput.",
   briefingChapters: [
     {
       id: "chapter-001",
@@ -36,17 +36,17 @@ export const mockVideoBrief = {
     },
   ],
   scriptPreview:
-    "Good morning. Riverside's governance score is 82, placing the hospital on elevated watch. The most time-sensitive risks are medication safety escalation in medical wards, infection control review in ICU, and delayed audit evidence for accreditation readiness.",
+    "Good morning. Riverside's governance score is 82, placing the hospital at moderate risk. The most time-sensitive risks are medication safety escalation in medical wards, infection control review in ICU, and delayed audit evidence for accreditation readiness.",
   narrativeScenes: [
     {
       id: "scene-001",
       type: "scorecard",
       durationInFrames: 150,
       voiceover:
-        "Riverside's daily governance score is 82, with elevated watch driven by safety, compliance, and flow signals.",
+        "Riverside's daily governance score is 82, with moderate risk driven by safety, compliance, and flow signals.",
       visual: {
         headline: "Governance Score 82",
-        metric: "Elevated Watch",
+        metric: "Moderate Risk",
         accent: "amber",
       },
     },
