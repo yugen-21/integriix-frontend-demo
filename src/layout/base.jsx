@@ -1,13 +1,19 @@
+import { useState } from "react";
 import Aside from "./aside";
 import Header from "./header";
 
 function Base({ children }) {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
   return (
     <div className="grid min-h-svh grid-cols-[292px_minmax(0,1fr)] bg-[#eef5f8] text-slate-900 max-[900px]:grid-cols-1">
-      <Aside />
+      <Aside
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+      />
 
       <div className="min-w-0 bg-[linear-gradient(180deg,#f8fbfd_0%,#eef5f8_48%,#f7fafc_100%)]">
-        <Header />
+        <Header onOpenSidebar={() => setIsSidebarOpen(true)} />
 
         <main
           id="daily-brief"

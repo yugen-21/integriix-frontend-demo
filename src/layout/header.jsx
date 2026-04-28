@@ -1,15 +1,26 @@
-import { FaBell, FaMagnifyingGlass } from "react-icons/fa6";
+import { FaBars, FaBell, FaMagnifyingGlass } from "react-icons/fa6";
 
-function Header() {
+function Header({ onOpenSidebar }) {
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between gap-6 border-b border-white/70 bg-white/85 px-8 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur-xl max-[900px]:flex-col max-[900px]:items-stretch max-[900px]:px-4">
-      <div className="min-w-0">
-        <p className="text-xs font-bold uppercase tracking-normal text-cyan-700">
-          Healthcare Governance Platform
-        </p>
-        <h1 className="truncate text-2xl font-black leading-tight text-slate-950">
-          Integriix Command Center
-        </h1>
+      <div className="flex min-w-0 items-center gap-3">
+        <button
+          className="hidden h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 max-[900px]:grid"
+          type="button"
+          aria-label="Open navigation"
+          onClick={onOpenSidebar}
+        >
+          <FaBars className="h-4 w-4" aria-hidden="true" />
+        </button>
+
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-normal text-cyan-700 max-[900px]:hidden">
+            Healthcare Governance Platform
+          </p>
+          <h1 className="text-2xl font-black leading-tight text-slate-950 max-[520px]:text-xl">
+            Integriix Command Center
+          </h1>
+        </div>
       </div>
 
       <div className="flex flex-1 items-center justify-end gap-4 max-[900px]:w-full max-[900px]:justify-start">
