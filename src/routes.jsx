@@ -2,7 +2,7 @@ import DailyBrief from "./Components/DailyBrief";
 
 export const routes = [
   {
-    path: "/daily-brief",
+    path: "/",
     element: <DailyBrief />,
   },
 ];

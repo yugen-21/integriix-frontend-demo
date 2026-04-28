@@ -1,15 +1,18 @@
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FaArrowTrendDown,
   FaArrowTrendUp,
   FaBolt,
-  FaCirclePlay,
   FaClipboardCheck,
   FaRegClock,
   FaShieldHeart,
   FaTriangleExclamation,
   FaVideo,
+  FaVolumeHigh,
+  FaVolumeXmark,
   FaWaveSquare,
 } from "react-icons/fa6";
+import { Player } from "@remotion/player";
 import {
   mockCriticalAlerts,
   mockDashboardMeta,
@@ -18,10 +21,20 @@ import {
   mockPriorityActions,
   mockVideoBrief,
 } from "../../data";
+import { DailyBriefVideo } from "../../remotion/DailyBriefVideo";
+import {
+  DAILY_BRIEF_FPS,
+  DAILY_BRIEF_HEIGHT,
+  DAILY_BRIEF_WIDTH,
+  dailyBriefNarrative,
+  getDailyBriefDurationInFrames,
+} from "../../remotion/narrativeBuilder";
 
 const priorityAlerts = mockCriticalAlerts.slice(0, 3);
 const priorityActions = mockPriorityActions.slice(0, 3);
 const keyKpis = mockExecutiveKpis.slice(0, 4);
+const briefingDurationInFrames =
+  getDailyBriefDurationInFrames(dailyBriefNarrative);
 
 const severityStyles = {
   Critical: "bg-red-50 text-red-700 ring-red-200",
@@ -29,7 +42,170 @@ const severityStyles = {
   Medium: "bg-cyan-50 text-cyan-700 ring-cyan-200",
 };
 
+function getNarrationTimeline(narrative) {
+  let from = 0;
+
+  return narrative.map((scene) => {
+    const timelineScene = {
+      ...scene,
+      from,
+      to: from + scene.durationInFrames,
+    };
+
+    from = timelineScene.to;
+    return timelineScene;
+  });
+}
+
 function DailyBrief() {
+  const playerRef = useRef(null);
+  const narrationStateRef = useRef({
+    active: false,
+    sceneIndex: 0,
+    sceneVoiceFinished: false,
+    waitingAtBoundary: false,
+  });
+  const advanceNarratedSceneRef = useRef(null);
+  const [isNarrating, setIsNarrating] = useState(false);
+  const narrationTimeline = useMemo(
+    () => getNarrationTimeline(dailyBriefNarrative),
+    [],
+  );
+
+  const finishNarration = () => {
+    narrationStateRef.current = {
+      active: false,
+      sceneIndex: 0,
+      sceneVoiceFinished: false,
+      waitingAtBoundary: false,
+    };
+    setIsNarrating(false);
+  };
+
+  const stopNarration = () => {
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+
+    playerRef.current?.pause?.();
+    finishNarration();
+  };
+
+  const playSceneNarration = (sceneIndex) => {
+    const scene = narrationTimeline[sceneIndex];
+
+    narrationStateRef.current.sceneVoiceFinished = false;
+    narrationStateRef.current.waitingAtBoundary = false;
+
+    if (!scene?.voiceover || !("speechSynthesis" in window)) {
+      narrationStateRef.current.sceneVoiceFinished = true;
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(scene.voiceover);
+    utterance.rate = 0.92;
+    utterance.pitch = 0.96;
+    utterance.volume = 1;
+    utterance.onend = () => {
+      narrationStateRef.current.sceneVoiceFinished = true;
+
+      if (narrationStateRef.current.waitingAtBoundary) {
+        advanceNarratedSceneRef.current?.();
+      }
+    };
+    utterance.onerror = () => {
+      narrationStateRef.current.sceneVoiceFinished = true;
+
+      if (narrationStateRef.current.waitingAtBoundary) {
+        advanceNarratedSceneRef.current?.();
+      }
+    };
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const advanceNarratedScene = () => {
+    const nextSceneIndex = narrationStateRef.current.sceneIndex + 1;
+    const nextScene = narrationTimeline[nextSceneIndex];
+
+    if (!narrationStateRef.current.active || !nextScene) {
+      playerRef.current?.pause?.();
+      finishNarration();
+      return;
+    }
+
+    narrationStateRef.current.sceneIndex = nextSceneIndex;
+    narrationStateRef.current.sceneVoiceFinished = false;
+    narrationStateRef.current.waitingAtBoundary = false;
+
+    playerRef.current?.seekTo?.(nextScene.from);
+    playerRef.current?.play?.();
+    playSceneNarration(nextSceneIndex);
+  };
+
+  const playBriefingWithNarration = () => {
+    if (!("speechSynthesis" in window)) {
+      playerRef.current?.seekTo?.(0);
+      playerRef.current?.play?.();
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    narrationStateRef.current = {
+      active: true,
+      sceneIndex: 0,
+      sceneVoiceFinished: false,
+      waitingAtBoundary: false,
+    };
+
+    playerRef.current?.seekTo?.(0);
+    playerRef.current?.play?.();
+    playSceneNarration(0);
+    setIsNarrating(true);
+  };
+
+  useEffect(() => {
+    advanceNarratedSceneRef.current = advanceNarratedScene;
+  });
+
+  useEffect(() => {
+    const player = playerRef.current;
+
+    if (!player) {
+      return undefined;
+    }
+
+    const handleFrameUpdate = ({ detail }) => {
+      const state = narrationStateRef.current;
+
+      if (!state.active) {
+        return;
+      }
+
+      const scene = narrationTimeline[state.sceneIndex];
+      const boundaryFrame = scene.to - 1;
+
+      if (detail.frame < boundaryFrame) {
+        return;
+      }
+
+      if (state.sceneVoiceFinished) {
+        advanceNarratedSceneRef.current?.();
+        return;
+      }
+
+      state.waitingAtBoundary = true;
+      player.pause();
+      player.seekTo(boundaryFrame);
+    };
+
+    player.addEventListener("frameupdate", handleFrameUpdate);
+
+    return () => {
+      player.removeEventListener("frameupdate", handleFrameUpdate);
+    };
+  }, [narrationTimeline]);
+
   return (
     <div className="grid gap-6">
       <section className="overflow-hidden rounded-3xl border border-white/80 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
@@ -135,23 +311,47 @@ function DailyBrief() {
             </span>
           </div>
 
-          <div className="mx-6 mb-6 grid min-h-72 place-items-center overflow-hidden rounded-3xl border border-slate-200 bg-[linear-gradient(135deg,#0f2742_0%,#123b5b_48%,#0f766e_100%)] p-8 text-center shadow-inner">
-            <div className="max-w-md">
-              <button
-                className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-white text-cyan-700 shadow-2xl shadow-slate-950/30 transition hover:scale-105"
-                type="button"
-                aria-label="Play briefing placeholder"
-              >
-                <FaCirclePlay className="h-9 w-9" aria-hidden="true" />
-              </button>
-              <p className="mt-6 text-2xl font-black text-white">
-                Executive video briefing area
-              </p>
-              <p className="mt-2 text-sm leading-6 text-cyan-50/80">
-                Video player, Remotion scenes, and playback actions will be
-                added in the video briefing step.
-              </p>
-            </div>
+          <div className="mx-6 mb-6 overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 shadow-inner">
+            <Player
+              ref={playerRef}
+              component={DailyBriefVideo}
+              inputProps={{ narrative: dailyBriefNarrative }}
+              durationInFrames={briefingDurationInFrames}
+              fps={DAILY_BRIEF_FPS}
+              compositionWidth={DAILY_BRIEF_WIDTH}
+              compositionHeight={DAILY_BRIEF_HEIGHT}
+              controls
+              loop
+              style={{
+                aspectRatio: "16 / 9",
+                backgroundColor: "#071b33",
+                width: "100%",
+              }}
+            />
+          </div>
+          <div className="mx-6 mb-6 flex flex-wrap items-center gap-3">
+            <button
+              className="inline-flex items-center gap-2 rounded-full bg-cyan-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-cyan-600/20 transition hover:bg-cyan-700"
+              type="button"
+              onClick={playBriefingWithNarration}
+            >
+              <FaVolumeHigh className="h-4 w-4" aria-hidden="true" />
+              Play with narration
+            </button>
+            <button
+              className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-200"
+              type="button"
+              onClick={stopNarration}
+              disabled={!isNarrating}
+            >
+              <FaVolumeXmark className="h-4 w-4" aria-hidden="true" />
+              Stop narration
+            </button>
+            <span className="text-sm font-semibold text-slate-500">
+              {isNarrating
+                ? "Narration playing from dashboard data"
+                : "Frontend voice preview"}
+            </span>
           </div>
         </article>
 
