@@ -13,64 +13,74 @@ const trendCards = [
     name: "Governance Health",
     trend: "+5 pts",
     description: "Governance health improved this week.",
-    tone: "emerald",
+    tone: "navy",
     Icon: FaWaveSquare,
   },
   {
     name: "Patient Safety",
     trend: "-8%",
     description: "Patient safety incidents decreased.",
-    tone: "cyan",
+    tone: "royal",
     Icon: FaShieldHeart,
   },
   {
     name: "Accreditation Readiness",
     trend: "+12%",
     description: "Accreditation readiness improved.",
-    tone: "blue",
+    tone: "bright",
     Icon: FaFileShield,
   },
   {
     name: "Audit Response Time",
     trend: "-6 hrs",
     description: "Audit response time got faster.",
-    tone: "violet",
+    tone: "sky",
     Icon: FaClockRotateLeft,
   },
   {
     name: "Financial Leakage",
     trend: "AED 154K",
     description: "Financial leakage detected for review.",
-    tone: "amber",
+    tone: "pale",
     Icon: FaSackDollar,
   },
 ];
 
 const trendToneStyles = {
-  emerald: {
-    accent: "bg-emerald-500",
-    badge: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    icon: "bg-emerald-50 text-emerald-700",
+  navy: {
+    accent: "#00357a",
+    badgeBg: "#e8f1ff",
+    iconBg: "#e8f1ff",
+    text: "#00357a",
+    ring: "#c2dcff",
   },
-  cyan: {
-    accent: "bg-cyan-500",
-    badge: "bg-cyan-50 text-cyan-700 ring-cyan-200",
-    icon: "bg-cyan-50 text-cyan-700",
+  royal: {
+    accent: "#006dc2",
+    badgeBg: "#e8f4ff",
+    iconBg: "#e8f4ff",
+    text: "#006dc2",
+    ring: "#c2dcff",
   },
-  blue: {
-    accent: "bg-blue-500",
-    badge: "bg-blue-50 text-blue-700 ring-blue-200",
-    icon: "bg-blue-50 text-blue-700",
+  bright: {
+    accent: "#1f80ff",
+    badgeBg: "#edf5ff",
+    iconBg: "#edf5ff",
+    text: "#1f80ff",
+    ring: "#c2dcff",
   },
-  violet: {
-    accent: "bg-violet-500",
-    badge: "bg-violet-50 text-violet-700 ring-violet-200",
-    icon: "bg-violet-50 text-violet-700",
+  sky: {
+    accent: "#5ca3ff",
+    badgeBg: "#f0f7ff",
+    iconBg: "#f0f7ff",
+    text: "#0057a3",
+    ring: "#c2dcff",
   },
-  amber: {
-    accent: "bg-amber-500",
-    badge: "bg-amber-50 text-amber-800 ring-amber-200",
-    icon: "bg-amber-50 text-amber-700",
+  pale: {
+    accent: "#c2dcff",
+    badgeBg: "#f5f9ff",
+    iconBg: "#f5f9ff",
+    text: "#00357a",
+    ring: "#c2dcff",
   },
 };
 
@@ -89,16 +99,22 @@ function TrendCards() {
             key={card.name}
             className="group overflow-hidden rounded-3xl border border-white/80 bg-white shadow-[0_16px_45px_rgba(15,23,42,0.07)] transition hover:-translate-y-1 hover:shadow-[0_24px_65px_rgba(15,23,42,0.11)]"
           >
-            <div className={`h-1.5 ${tone.accent}`} />
+            <div className="h-1.5" style={{ backgroundColor: tone.accent }} />
             <div className="p-5">
               <div className="flex items-start justify-between gap-3">
                 <span
-                  className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl ${tone.icon}`}
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl"
+                  style={{ backgroundColor: tone.iconBg, color: tone.text }}
                 >
                   <Icon className="h-5 w-5" aria-hidden="true" />
                 </span>
                 <span
-                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black ring-1 ${tone.badge}`}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-black ring-1"
+                  style={{
+                    backgroundColor: tone.badgeBg,
+                    color: tone.text,
+                    "--tw-ring-color": tone.ring,
+                  }}
                 >
                   <TrendIcon className="h-3 w-3" aria-hidden="true" />
                   {card.trend}

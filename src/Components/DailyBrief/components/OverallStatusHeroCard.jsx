@@ -51,7 +51,7 @@ function OverallStatusHeroCard({ status }) {
         <p className="text-xs font-black uppercase text-cyan-700">
           Executive summary
         </p>
-        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+        <p className="mt-2 text-sm leading-6 text-slate-600">
           {status.executiveSummary}
         </p>
       </div>

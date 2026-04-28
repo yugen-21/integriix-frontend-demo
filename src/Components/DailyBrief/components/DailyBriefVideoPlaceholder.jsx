@@ -42,6 +42,7 @@ function DailyBriefVideoPlaceholder() {
 
   const speakingRef = useRef(false);
   const pendingSceneRef = useRef(null);
+  const advanceToNextSceneRef = useRef(null);
 
   const speakText = useCallback((text, onDone) => {
     window.speechSynthesis.cancel();
@@ -77,8 +78,12 @@ function DailyBriefVideoPlaceholder() {
     sceneIdRef.current = next.id;
     player.play();
     setPlaying(true);
-    speakText(next.voiceover, advanceToNextScene);
+    speakText(next.voiceover, () => advanceToNextSceneRef.current?.());
   }, [speakText]);
+
+  useEffect(() => {
+    advanceToNextSceneRef.current = advanceToNextScene;
+  }, [advanceToNextScene]);
 
   // Poll the player's frame to detect scene changes
   const startPolling = useCallback(() => {

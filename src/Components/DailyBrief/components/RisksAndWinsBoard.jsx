@@ -51,7 +51,7 @@ function RiskLadder({ risks, selectedId, onSelect }) {
                 {index + 1}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-sm font-black text-slate-950">
+                <span className="block truncate text-sm text-slate-950">
                   {risk.name}
                 </span>
                 <span className="mt-2 block h-2 overflow-hidden rounded-full bg-white ring-1 ring-slate-200">
@@ -109,12 +109,8 @@ function WinTiles({ wins, selectedId, onSelect }) {
               <p className="text-xl font-black leading-none text-emerald-700">
                 {win.measurableImprovement}
               </p>
-              <p className="mt-3 text-sm font-black leading-tight text-slate-950">
-                {win.title}
-              </p>
-              <p className="mt-2 text-xs font-semibold text-slate-500">
-                {win.department}
-              </p>
+              <p className="mt-3 text-sm ">{win.title}</p>
+              <p className="mt-2 text-xs text-slate-500">{win.department}</p>
             </button>
           );
         })}
@@ -190,8 +186,7 @@ function SelectionDetail({ selection, risks, wins }) {
             </span>
             <span
               className={`rounded-full px-3 py-1 text-xs font-black ring-1 ${
-                mitigationStyles[risk.mitigationStatus] ??
-                mitigationStyles.Open
+                mitigationStyles[risk.mitigationStatus] ?? mitigationStyles.Open
               }`}
             >
               {risk.mitigationStatus}
@@ -221,7 +216,10 @@ function SelectionDetail({ selection, risks, wins }) {
           ["Urgency", risk.scoring.urgency],
           ["Exposure", risk.scoring.exposure],
         ].map(([label, value]) => (
-          <div key={label} className="rounded-2xl bg-white p-3 ring-1 ring-white">
+          <div
+            key={label}
+            className="rounded-2xl bg-white p-3 ring-1 ring-white"
+          >
             <p className="text-[11px] font-black uppercase text-slate-500">
               {label}
             </p>

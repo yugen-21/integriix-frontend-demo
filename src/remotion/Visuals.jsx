@@ -1,4 +1,4 @@
-import { interpolate, useCurrentFrame, useVideoConfig, spring } from "remotion";
+import { interpolate, useCurrentFrame } from "remotion";
 
 /* ── Animated Gauge ──────────────────────────────────────── */
 export function AnimatedGauge({ value, size = 340 }) {
@@ -67,7 +67,6 @@ export function RadarChart({ dimensions, size = 380 }) {
 /* ── Waterfall Chart ─────────────────────────────────────── */
 export function WaterfallChart({ drivers, direction = "down", width = 700, height = 300 }) {
   const frame = useCurrentFrame();
-  const progress = interpolate(frame, [8, 80], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   const barW = Math.min(120, (width - 40) / drivers.length - 20);
   const maxImpact = Math.max(...drivers.map((d) => Math.abs(parseInt(d.impact))));
   const barColor = direction === "down"
