@@ -1,731 +1,319 @@
-import {
-  AbsoluteFill,
-  Sequence,
-  interpolate,
-  spring,
-  useCurrentFrame,
-  useVideoConfig,
-} from "remotion";
-import { DAILY_BRIEF_FPS } from "./narrativeBuilder";
+import { AbsoluteFill, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { AnimatedGauge, RadarChart, WaterfallChart, SeverityHeatGrid, TimelineVisual, HospitalFlowNetwork, VoiceoverCaption } from "./Visuals";
 
-function SceneFrame({ eyebrow, title, children, variant = "default" }) {
+/* ── Scene Frame ─────────────────────────────────────────── */
+
+function SceneFrame({ eyebrow, title, children, variant = "dark", voiceover }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const entrance = spring({
-    frame,
-    fps,
-    config: { damping: 18, stiffness: 95 },
-  });
-  const opacity = interpolate(frame, [0, 24], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  const entrance = spring({ frame, fps, config: { damping: 18, stiffness: 95 } });
+  const opacity = interpolate(frame, [0, 24], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const isLight = variant === "light";
 
   return (
-    <AbsoluteFill
-      style={{
-        background:
-          variant === "light"
-            ? "linear-gradient(135deg, #eff6ff 0%, #ffffff 52%, #ecfeff 100%)"
-            : "linear-gradient(135deg, #071b33 0%, #0f3558 54%, #0f766e 100%)",
-        color: variant === "light" ? "#0f172a" : "#ffffff",
-        fontFamily:
-          "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
-        padding: 92,
-      }}
-    >
-      <div
-        style={{
-          border: "1px solid rgba(14, 116, 144, 0.16)",
-          borderRadius: "50%",
-          height: 520,
-          opacity: variant === "light" ? 0.28 : 0.18,
-          position: "absolute",
-          right: -120,
-          top: -120,
-          width: 520,
-        }}
-      />
-      <div
-        style={{
-          background:
-            variant === "light"
-              ? "rgba(14, 165, 233, 0.08)"
-              : "rgba(125, 211, 252, 0.08)",
-          borderRadius: "50%",
-          bottom: -220,
-          height: 620,
-          left: -180,
-          position: "absolute",
-          width: 620,
-        }}
-      />
-      <div
-        style={{
-          opacity,
-          transform: `translateY(${(1 - entrance) * 26}px)`,
-          position: "relative",
-        }}
-      >
-        <div
-          style={{
-            display: "inline-flex",
-            borderRadius: 999,
-            border: "1px solid rgba(255,255,255,0.24)",
-            background:
-              variant === "light"
-                ? "rgba(14, 116, 144, 0.1)"
-                : "rgba(255,255,255,0.12)",
-            color: variant === "light" ? "#0e7490" : "#a5f3fc",
-            fontSize: 28,
-            fontWeight: 800,
-            letterSpacing: 0,
-            padding: "14px 24px",
-            textTransform: "uppercase",
-          }}
-        >
-          {eyebrow}
-        </div>
-        <h1
-          style={{
-            fontSize: 82,
-            lineHeight: 1,
-            letterSpacing: 0,
-            margin: "38px 0 0",
-            maxWidth: 1260,
-          }}
-        >
-          {title}
-        </h1>
+    <AbsoluteFill style={{
+      background: isLight
+        ? "linear-gradient(135deg,#eff6ff 0%,#ffffff 52%,#ecfeff 100%)"
+        : "linear-gradient(135deg,#071b33 0%,#0f3558 54%,#0f766e 100%)",
+      color: isLight ? "#0f172a" : "#ffffff",
+      fontFamily: "Inter,ui-sans-serif,system-ui,sans-serif",
+      padding: 80,
+    }}>
+      <div style={{ border: "1px solid rgba(14,116,144,0.16)", borderRadius: "50%", height: 520, opacity: 0.18, position: "absolute", right: -120, top: -120, width: 520 }} />
+      <div style={{ background: isLight ? "rgba(14,165,233,0.08)" : "rgba(125,211,252,0.08)", borderRadius: "50%", bottom: -220, height: 620, left: -180, position: "absolute", width: 620 }} />
+      <div style={{ opacity, transform: `translateY(${(1 - entrance) * 26}px)`, position: "relative" }}>
+        <div style={{
+          display: "inline-flex", borderRadius: 999,
+          border: `1px solid ${isLight ? "rgba(14,116,144,0.2)" : "rgba(255,255,255,0.24)"}`,
+          background: isLight ? "rgba(14,116,144,0.1)" : "rgba(255,255,255,0.12)",
+          color: isLight ? "#0e7490" : "#a5f3fc",
+          fontSize: 24, fontWeight: 800, letterSpacing: 1, padding: "12px 22px", textTransform: "uppercase",
+        }}>{eyebrow}</div>
+        <h1 style={{ fontSize: 68, lineHeight: 1.05, margin: "28px 0 0", maxWidth: 1300 }}>{title}</h1>
         {children}
       </div>
+      {voiceover && <VoiceoverCaption text={voiceover} variant={variant} />}
     </AbsoluteFill>
   );
 }
 
-function AnimatedGauge({ value }) {
-  const frame = useCurrentFrame();
-  const progress = interpolate(frame, [0, 70], [0, value / 100], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const radius = 150;
-  const circumference = 2 * Math.PI * radius;
-
-  return (
-    <svg width="420" height="420" viewBox="0 0 420 420">
-      <circle
-        cx="210"
-        cy="210"
-        r={radius}
-        fill="rgba(255,255,255,0.08)"
-        stroke="rgba(255,255,255,0.16)"
-        strokeWidth="36"
-      />
-      <circle
-        cx="210"
-        cy="210"
-        r={radius}
-        fill="transparent"
-        stroke="#22d3ee"
-        strokeDasharray={`${circumference * progress} ${circumference}`}
-        strokeLinecap="round"
-        strokeWidth="36"
-        transform="rotate(-90 210 210)"
-      />
-      <circle cx="210" cy="210" r="104" fill="rgba(7,27,51,0.82)" />
-      <text
-        x="210"
-        y="198"
-        fill="#ffffff"
-        fontSize="84"
-        fontWeight="900"
-        textAnchor="middle"
-      >
-        {Math.round(progress * 100)}
-      </text>
-      <text
-        x="210"
-        y="246"
-        fill="#a5f3fc"
-        fontSize="28"
-        fontWeight="800"
-        textAnchor="middle"
-      >
-        SCORE
-      </text>
-    </svg>
-  );
-}
-
-function SignalLineChart({ tone = "dark" }) {
-  const frame = useCurrentFrame();
-  const progress = interpolate(frame, [20, 110], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const points = [
-    [0, 210],
-    [160, 178],
-    [320, 190],
-    [480, 122],
-    [640, 144],
-    [800, 74],
-  ];
-  const path = points
-    .map(([x, y], index) => `${index === 0 ? "M" : "L"} ${x} ${y}`)
-    .join(" ");
-
-  return (
-    <svg width="900" height="310" viewBox="0 0 900 310">
-      {[60, 130, 200, 270].map((y) => (
-        <line
-          key={y}
-          x1="0"
-          x2="860"
-          y1={y}
-          y2={y}
-          stroke={tone === "dark" ? "rgba(255,255,255,0.12)" : "#dbeafe"}
-          strokeWidth="2"
-        />
-      ))}
-      <path
-        d={path}
-        fill="none"
-        stroke="#06b6d4"
-        strokeDasharray="980"
-        strokeDashoffset={980 * (1 - progress)}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="12"
-      />
-      {points.map(([x, y], index) => (
-        <circle
-          key={`${x}-${y}`}
-          cx={x}
-          cy={y}
-          fill={index > 2 ? "#f59e0b" : "#22d3ee"}
-          opacity={progress > index / points.length ? 1 : 0}
-          r="13"
-        />
-      ))}
-      <text
-        x="0"
-        y="302"
-        fill={tone === "dark" ? "#bae6fd" : "#0e7490"}
-        fontSize="24"
-        fontWeight="800"
-      >
-        Daily governance signal trend
-      </text>
-    </svg>
-  );
-}
-
-function RiskBars({ alerts }) {
-  const frame = useCurrentFrame();
-  const severityValues = { Critical: 96, High: 82, Medium: 58 };
-
-  return (
-    <div style={{ display: "grid", gap: 26, width: 760 }}>
-      {alerts.map((alert, index) => {
-        const width = interpolate(
-          frame,
-          [index * 12, 70 + index * 12],
-          [0, severityValues[alert.severity] ?? 52],
-          {
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-          },
-        );
-
-        return (
-          <div key={alert.id}>
-            <div
-              style={{
-                alignItems: "center",
-                display: "flex",
-                justifyContent: "space-between",
-              }}
-            >
-              <span style={{ color: "#ffffff", fontSize: 28, fontWeight: 900 }}>
-                {alert.department}
-              </span>
-              <span style={{ color: "#bae6fd", fontSize: 22, fontWeight: 800 }}>
-                {alert.severity}
-              </span>
-            </div>
-            <div
-              style={{
-                background: "rgba(255,255,255,0.12)",
-                borderRadius: 999,
-                height: 34,
-                marginTop: 12,
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  background:
-                    alert.severity === "Critical"
-                      ? "linear-gradient(90deg,#fb7185,#ef4444)"
-                      : "linear-gradient(90deg,#22d3ee,#f59e0b)",
-                  borderRadius: 999,
-                  height: "100%",
-                  width: `${width}%`,
-                }}
-              />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function HospitalFlowVisual() {
-  const frame = useCurrentFrame();
-  const pulse = interpolate(frame % 60, [0, 30, 60], [0.35, 1, 0.35]);
-  const nodes = [
-    ["ICU", 160, 170, "#ef4444"],
-    ["Medical Wards", 410, 110, "#f59e0b"],
-    ["Bed Mgmt", 680, 190, "#06b6d4"],
-    ["Revenue", 500, 360, "#22c55e"],
-  ];
-
-  return (
-    <svg width="860" height="500" viewBox="0 0 860 500">
-      <path
-        d="M190 170 C280 120, 320 120, 380 120"
-        fill="none"
-        stroke="rgba(255,255,255,0.18)"
-        strokeWidth="8"
-      />
-      <path
-        d="M455 135 C540 150, 590 175, 650 190"
-        fill="none"
-        stroke="rgba(255,255,255,0.18)"
-        strokeWidth="8"
-      />
-      <path
-        d="M665 225 C615 300, 560 340, 520 355"
-        fill="none"
-        stroke="rgba(255,255,255,0.18)"
-        strokeWidth="8"
-      />
-      {nodes.map(([label, x, y, color]) => (
-        <g key={label}>
-          <circle cx={x} cy={y} fill={color} opacity={pulse} r="72" />
-          <circle
-            cx={x}
-            cy={y}
-            fill="rgba(15,23,42,0.88)"
-            stroke={color}
-            strokeWidth="6"
-            r="58"
-          />
-          <text
-            x={x}
-            y={y + 8}
-            fill="#ffffff"
-            fontSize="24"
-            fontWeight="900"
-            textAnchor="middle"
-          >
-            {label}
-          </text>
-        </g>
-      ))}
-    </svg>
-  );
-}
-
-function ActionTimeline({ actions }) {
-  const frame = useCurrentFrame();
-
-  return (
-    <div
-      style={{
-        display: "grid",
-        gap: 34,
-        gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-        position: "relative",
-      }}
-    >
-      <div
-        style={{
-          background: "#bae6fd",
-          height: 8,
-          left: 120,
-          position: "absolute",
-          right: 120,
-          top: 80,
-        }}
-      />
-      {actions.map((action, index) => {
-        const reveal = interpolate(frame, [index * 20, index * 20 + 40], [0, 1], {
-          extrapolateLeft: "clamp",
-          extrapolateRight: "clamp",
-        });
-
-        return (
-          <div
-            key={action.id}
-            style={{
-              opacity: reveal,
-              position: "relative",
-              transform: `translateY(${(1 - reveal) * 22}px)`,
-            }}
-          >
-            <div
-              style={{
-                background: "#0891b2",
-                border: "8px solid #e0f2fe",
-                borderRadius: "50%",
-                color: "#ffffff",
-                display: "grid",
-                fontSize: 38,
-                fontWeight: 900,
-                height: 112,
-                margin: "24px auto 28px",
-                placeItems: "center",
-                position: "relative",
-                width: 112,
-                zIndex: 2,
-              }}
-            >
-              {index + 1}
-            </div>
-            <div
-              style={{
-                background: "#ffffff",
-                border: "1px solid #dbeafe",
-                borderRadius: 30,
-                boxShadow: "0 18px 42px rgba(15, 23, 42, 0.08)",
-                minHeight: 250,
-                padding: "32px 28px",
-                textAlign: "center",
-              }}
-            >
-              <div
-                style={{
-                  color: "#0f172a",
-                  fontSize: 31,
-                  fontWeight: 900,
-                  lineHeight: 1.12,
-                }}
-              >
-                {action.title}
-              </div>
-              <div
-                style={{
-                  color: "#0f766e",
-                  fontSize: 24,
-                  fontWeight: 900,
-                  lineHeight: 1.22,
-                  marginTop: 26,
-                }}
-              >
-                {action.owner}
-              </div>
-              <div
-                style={{
-                  color: "#64748b",
-                  fontSize: 24,
-                  fontWeight: 800,
-                  marginTop: 10,
-                }}
-              >
-                {action.due}
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+/* ── 1. Title Scene ──────────────────────────────────────── */
 
 function TitleScene({ scene }) {
+  const ragBg = scene.ragStatus === "Red" ? "#ef4444" : scene.ragStatus === "Green" ? "#22c55e" : "#fbbf24";
+  const ragFg = scene.ragStatus === "Amber" ? "#422006" : "#fff";
+
   return (
-    <SceneFrame eyebrow={scene.eyebrow} title={scene.title}>
-      <p style={{ color: "#bae6fd", fontSize: 42, marginTop: 34 }}>
-        {scene.subtitle}
-      </p>
-      <div
-        style={{
-          alignItems: "center",
-          display: "flex",
-          gap: 72,
-          marginTop: 54,
-        }}
-      >
-        <AnimatedGauge value={scene.score} />
-        <div>
-          <div
-            style={{
-              background: "#fbbf24",
-              borderRadius: 999,
-              color: "#422006",
-              display: "inline-flex",
-              fontSize: 34,
-              fontWeight: 900,
-              padding: "24px 34px",
-            }}
-          >
-            {scene.status}
-          </div>
-          <div style={{ marginTop: 34 }}>
-            <SignalLineChart />
+    <SceneFrame eyebrow={scene.eyebrow} title={scene.title} voiceover={scene.voiceover}>
+      <p style={{ color: "#bae6fd", fontSize: 30, margin: "6px 0 0" }}>{scene.subtitle}</p>
+      <p style={{ color: "#94a3b8", fontSize: 22, margin: "4px 0 0" }}>{scene.date} · {scene.briefOwner}</p>
+      <div style={{ display: "grid", gridTemplateColumns: "340px 380px 1fr", gap: 40, marginTop: 32, alignItems: "center" }}>
+        <div style={{ textAlign: "center" }}>
+          <AnimatedGauge value={scene.score} />
+          <div style={{ background: ragBg, borderRadius: 999, color: ragFg, display: "inline-flex", fontSize: 22, fontWeight: 900, marginTop: 12, padding: "10px 24px" }}>
+            {scene.ragStatus} Status
           </div>
         </div>
+        <RadarChart dimensions={scene.dimensions} />
+        <div style={{ display: "grid", gap: 10 }}>
+          {scene.dimensions.map((d) => {
+            const c = d.ragStatus === "Red" ? "#fca5a5" : d.ragStatus === "Amber" ? "#fcd34d" : "#67e8f9";
+            return (
+              <div key={d.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 20, fontWeight: 700 }}>
+                <span>{d.label}</span>
+                <span style={{ color: c }}>{d.score}%</span>
+              </div>
+            );
+          })}
+        </div>
       </div>
-      <p style={{ color: "#cbd5e1", fontSize: 30, marginTop: 64 }}>
-        {scene.meta}
-      </p>
     </SceneFrame>
   );
 }
 
-function SummaryScene({ scene }) {
+/* ── 2. Drivers Down Scene ───────────────────────────────── */
+
+function DriversDownScene({ scene }) {
+  const frame = useCurrentFrame();
   return (
-    <SceneFrame eyebrow={scene.eyebrow} title={scene.title} variant="light">
-      <div
-        style={{
-          display: "grid",
-          gap: 52,
-          gridTemplateColumns: "860px 1fr",
-          marginTop: 44,
-          alignItems: "center",
-        }}
-      >
-        <SignalLineChart tone="light" />
-        <div>
-          <p
-            style={{
-              color: "#475569",
-              fontSize: 34,
-              lineHeight: 1.45,
-              margin: 0,
-            }}
-          >
-            {scene.body}
-          </p>
-          <div style={{ display: "grid", gap: 18, marginTop: 36 }}>
-            {scene.bullets.slice(0, 3).map((bullet, index) => (
-              <div
-                key={bullet}
-                style={{
-                  alignItems: "center",
-                  display: "grid",
-                  gap: 18,
-                  gridTemplateColumns: "42px 1fr",
-                }}
-              >
-                <span
-                  style={{
-                    background: "#0891b2",
-                    borderRadius: "50%",
-                    color: "#ffffff",
-                    display: "grid",
-                    fontSize: 22,
-                    fontWeight: 900,
-                    height: 42,
-                    placeItems: "center",
-                    width: 42,
-                  }}
-                >
-                  {index + 1}
-                </span>
-                <span
-                  style={{
-                    color: "#0f172a",
-                    fontSize: 28,
-                    fontWeight: 800,
-                    lineHeight: 1.28,
-                  }}
-                >
-                  {bullet}
-                </span>
+    <SceneFrame eyebrow={scene.eyebrow} title={scene.title} voiceover={scene.voiceover}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 700px", gap: 48, marginTop: 40, alignItems: "center" }}>
+        <div style={{ display: "grid", gap: 28 }}>
+          {scene.drivers.map((d, i) => {
+            const reveal = interpolate(frame, [i * 18, i * 18 + 40], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+            return (
+              <div key={d.title} style={{
+                opacity: reveal, transform: `translateX(${(1 - reveal) * 40}px)`,
+                background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)",
+                borderRadius: 20, padding: "24px 28px",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 28, fontWeight: 900 }}>{d.title}</span>
+                  <span style={{ fontSize: 36, fontWeight: 900, color: "#fca5a5" }}>{d.impact}</span>
+                </div>
+                <p style={{ fontSize: 20, color: "#cbd5e1", lineHeight: 1.35, marginTop: 8 }}>{d.reason}</p>
+                <span style={{ fontSize: 16, fontWeight: 700, color: "#f87171", marginTop: 6, display: "inline-block" }}>{d.dimension}</span>
               </div>
-            ))}
-          </div>
+            );
+          })}
+        </div>
+        <WaterfallChart drivers={scene.drivers} direction="down" />
+      </div>
+    </SceneFrame>
+  );
+}
+
+/* ── 3. Drivers Up Scene ─────────────────────────────────── */
+
+function DriversUpScene({ scene }) {
+  const frame = useCurrentFrame();
+  return (
+    <SceneFrame eyebrow={scene.eyebrow} title={scene.title} voiceover={scene.voiceover}>
+      <div style={{ display: "grid", gridTemplateColumns: "700px 1fr", gap: 48, marginTop: 40, alignItems: "center" }}>
+        <WaterfallChart drivers={scene.drivers} direction="up" />
+        <div style={{ display: "grid", gap: 28 }}>
+          {scene.drivers.map((d, i) => {
+            const reveal = interpolate(frame, [i * 18, i * 18 + 40], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+            return (
+              <div key={d.title} style={{
+                opacity: reveal, transform: `translateX(${(reveal - 1) * -40}px)`,
+                background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)",
+                borderRadius: 20, padding: "24px 28px",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 28, fontWeight: 900 }}>{d.title}</span>
+                  <span style={{ fontSize: 36, fontWeight: 900, color: "#86efac" }}>{d.impact}</span>
+                </div>
+                <p style={{ fontSize: 20, color: "#cbd5e1", lineHeight: 1.35, marginTop: 8 }}>{d.reason}</p>
+                <span style={{ fontSize: 16, fontWeight: 700, color: "#4ade80", marginTop: 6, display: "inline-block" }}>{d.dimension}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </SceneFrame>
   );
 }
+
+/* ── 4. Alerts Scene ─────────────────────────────────────── */
 
 function AlertsScene({ scene }) {
+  const frame = useCurrentFrame();
+  const sevColor = { Critical: "#ef4444", High: "#f59e0b", Medium: "#3b82f6" };
+
   return (
-    <SceneFrame eyebrow={scene.eyebrow} title={scene.title}>
-      <div
-        style={{
-          alignItems: "center",
-          display: "grid",
-          gap: 64,
-          gridTemplateColumns: "760px 1fr",
-          marginTop: 48,
-        }}
-      >
-        <RiskBars alerts={scene.alerts} />
-        <HospitalFlowVisual />
-      </div>
-      <div
-        style={{
-          display: "grid",
-          gap: 18,
-          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-          marginTop: 38,
-        }}
-      >
-        {scene.alerts.map((alert) => (
-          <div key={alert.id}>
-            <div style={{ fontSize: 28, fontWeight: 900 }}>{alert.title}</div>
-            <p
-              style={{
-                color: "#dbeafe",
-                fontSize: 22,
-                lineHeight: 1.3,
-                marginTop: 10,
-              }}
-            >
-              {alert.source} · Due {alert.due}
-            </p>
-          </div>
-        ))}
+    <SceneFrame eyebrow={scene.eyebrow} title={scene.title} voiceover={scene.voiceover}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 40, marginTop: 36, alignItems: "start" }}>
+        <div style={{ display: "grid", gap: 16 }}>
+          {scene.alerts.map((a, i) => {
+            const reveal = interpolate(frame, [i * 12, i * 12 + 32], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+            const bg = sevColor[a.severity] ?? "#64748b";
+            return (
+              <div key={a.id} style={{
+                opacity: reveal, transform: `translateY(${(1 - reveal) * 18}px)`,
+                display: "grid", gridTemplateColumns: "6px 1fr auto", gap: 18,
+                background: "rgba(255,255,255,0.06)", borderRadius: 18, padding: "18px 24px",
+                border: "1px solid rgba(255,255,255,0.1)",
+              }}>
+                <div style={{ background: bg, borderRadius: 999 }} />
+                <div>
+                  <div style={{ fontSize: 24, fontWeight: 900 }}>{a.title}</div>
+                  <p style={{ fontSize: 18, color: "#94a3b8", margin: "4px 0 0", lineHeight: 1.3 }}>{a.summary}</p>
+                </div>
+                <div style={{ textAlign: "right", minWidth: 150 }}>
+                  <span style={{ background: `${bg}22`, border: `1px solid ${bg}66`, borderRadius: 999, color: bg, fontSize: 17, fontWeight: 900, padding: "5px 14px" }}>
+                    {a.severity}
+                  </span>
+                  <div style={{ color: "#bae6fd", fontSize: 17, fontWeight: 700, marginTop: 8 }}>{a.location} · {a.due}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display: "grid", gap: 24 }}>
+          <SeverityHeatGrid alerts={scene.alerts} />
+          <HospitalFlowNetwork alerts={scene.alerts} />
+        </div>
       </div>
     </SceneFrame>
   );
 }
+
+/* ── 5. Due Today Scene ──────────────────────────────────── */
+
+function DueTodayScene({ scene }) {
+  const frame = useCurrentFrame();
+  const rc = { "At Risk": "#ef4444", Blocked: "#dc2626", Watch: "#f59e0b", "On Track": "#22c55e" };
+
+  return (
+    <SceneFrame eyebrow={scene.eyebrow} title={scene.title} variant="light" voiceover={scene.voiceover}>
+      <div style={{ marginTop: 32 }}>
+        <TimelineVisual deadlines={scene.deadlines} width={1700} />
+      </div>
+      <div style={{ display: "grid", gap: 20, marginTop: 28 }}>
+        {scene.deadlines.map((d, i) => {
+          const reveal = interpolate(frame, [i * 14 + 20, i * 14 + 54], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+          const c = rc[d.readinessStatus] ?? "#64748b";
+          return (
+            <div key={d.id} style={{
+              opacity: reveal, transform: `translateX(${(1 - reveal) * 28}px)`,
+              display: "grid", gridTemplateColumns: "90px 1fr auto", gap: 24,
+              background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 20,
+              padding: "22px 26px", boxShadow: "0 6px 24px rgba(15,23,42,0.05)",
+            }}>
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 34, fontWeight: 900, color: "#0f172a" }}>{d.time}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#64748b", marginTop: 2 }}>{d.type}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 900, color: "#0f172a" }}>{d.title}</div>
+                <p style={{ fontSize: 18, color: "#64748b", margin: "4px 0 0", lineHeight: 1.3 }}>{d.consequenceOfDelay}</p>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                <span style={{ background: `${c}18`, border: `1px solid ${c}55`, borderRadius: 999, color: c, fontSize: 16, fontWeight: 900, padding: "5px 14px" }}>
+                  {d.readinessStatus}
+                </span>
+                <span style={{ color: "#0e7490", fontSize: 18, fontWeight: 700 }}>{d.owner}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </SceneFrame>
+  );
+}
+
+/* ── 6. Actions Scene ────────────────────────────────────── */
 
 function ActionsScene({ scene }) {
+  const frame = useCurrentFrame();
+  const sc = { Critical: "#ef4444", High: "#f59e0b", Medium: "#3b82f6" };
+
   return (
-    <SceneFrame eyebrow={scene.eyebrow} title={scene.title} variant="light">
-      <div style={{ marginTop: 70 }}>
-        <ActionTimeline actions={scene.actions} />
-      </div>
-      <div
-        style={{
-          display: "grid",
-          gap: 22,
-          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-          marginTop: 10,
-        }}
-      >
-        {scene.actions.map((action) => (
-          <div key={action.id}>
-            <div
-              style={{
-                alignItems: "center",
-                display: "flex",
-                gap: 14,
-              }}
-            >
-              <span
-                style={{
-                  background:
-                    action.priority === "Critical" ? "#fecaca" : "#fef3c7",
-                  borderRadius: 999,
-                  color: "#0f172a",
-                  fontSize: 22,
-                  fontWeight: 900,
-                  padding: "9px 15px",
-                }}
-              >
-                {action.priority}
-              </span>
-              <span style={{ color: "#0f172a", fontSize: 25, fontWeight: 900 }}>
-                {action.title}
-              </span>
+    <SceneFrame eyebrow={scene.eyebrow} title={scene.title} variant="light" voiceover={scene.voiceover}>
+      <div style={{ display: "grid", gap: 22, marginTop: 40 }}>
+        {scene.actions.map((a, i) => {
+          const reveal = interpolate(frame, [i * 18, i * 18 + 44], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+          return (
+            <div key={a.id} style={{
+              opacity: reveal, transform: `translateY(${(1 - reveal) * 22}px)`,
+              display: "grid", gridTemplateColumns: "56px 1fr", gap: 22,
+              background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 20,
+              padding: "22px 28px", boxShadow: "0 6px 24px rgba(15,23,42,0.05)",
+            }}>
+              <div style={{
+                background: "#0891b2", borderRadius: "50%", color: "#fff",
+                display: "grid", fontSize: 26, fontWeight: 900, height: 56, placeItems: "center", width: 56,
+              }}>{i + 1}</div>
+              <div>
+                <div style={{ fontSize: 24, fontWeight: 900, color: "#0f172a", lineHeight: 1.2 }}>{a.title}</div>
+                <div style={{ display: "flex", gap: 14, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ color: "#0e7490", fontSize: 18, fontWeight: 800 }}>{a.owner}</span>
+                  <span style={{ color: "#94a3b8" }}>·</span>
+                  <span style={{ color: "#64748b", fontSize: 18, fontWeight: 700 }}>Due {a.due}</span>
+                  <span style={{
+                    background: `${sc[a.severity] ?? "#64748b"}18`, border: `1px solid ${sc[a.severity] ?? "#64748b"}55`,
+                    borderRadius: 999, color: sc[a.severity] ?? "#64748b", fontSize: 15, fontWeight: 900, padding: "3px 12px",
+                  }}>{a.severity}</span>
+                </div>
+              </div>
             </div>
-            <p
-              style={{
-                color: "#475569",
-                fontSize: 22,
-                lineHeight: 1.35,
-                marginTop: 12,
-              }}
-            >
-              {action.reason}
-            </p>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </SceneFrame>
   );
 }
+
+/* ── 7. Closing Scene ────────────────────────────────────── */
 
 function ClosingScene({ scene }) {
+  const ragBg = scene.ragStatus === "Red" ? "#ef4444" : scene.ragStatus === "Green" ? "#22c55e" : "#fbbf24";
+
   return (
-    <SceneFrame eyebrow={scene.eyebrow} title={scene.title}>
-      <p style={{ color: "#bae6fd", fontSize: 38, marginTop: 42 }}>
-        {scene.subtitle}
-      </p>
-      <div
-        style={{
-          background: "#dcfce7",
-          borderRadius: 999,
-          color: "#166534",
-          display: "inline-flex",
-          fontSize: 28,
-          fontWeight: 900,
-          marginTop: 54,
-          padding: "16px 26px",
-        }}
-      >
-        Briefing status: {scene.status}
+    <SceneFrame eyebrow={scene.eyebrow} title={scene.title} voiceover={scene.voiceover}>
+      <p style={{ color: "#bae6fd", fontSize: 30, marginTop: 28 }}>{scene.subtitle}</p>
+      <div style={{ display: "flex", gap: 28, marginTop: 44, alignItems: "center" }}>
+        <AnimatedGauge value={scene.score} size={220} />
+        <div>
+          <div style={{ background: ragBg, borderRadius: 999, color: scene.ragStatus === "Amber" ? "#422006" : "#fff", display: "inline-flex", fontSize: 22, fontWeight: 900, padding: "10px 24px" }}>
+            {scene.ragStatus} Status
+          </div>
+          <p style={{ color: "#cbd5e1", fontSize: 24, marginTop: 14 }}>Prepared for {scene.briefOwner}</p>
+        </div>
+      </div>
+      <div style={{ background: "#dcfce7", borderRadius: 999, color: "#166534", display: "inline-flex", fontSize: 22, fontWeight: 900, marginTop: 44, padding: "12px 24px" }}>
+        Briefing complete
       </div>
     </SceneFrame>
   );
 }
 
+/* ── Scene Router ────────────────────────────────────────── */
+
+const sceneMap = { title: TitleScene, driversDown: DriversDownScene, driversUp: DriversUpScene, alerts: AlertsScene, dueToday: DueTodayScene, actions: ActionsScene, closing: ClosingScene };
+
 function RenderScene({ scene }) {
-  if (scene.type === "title") {
-    return <TitleScene scene={scene} />;
-  }
-
-  if (scene.type === "summary") {
-    return <SummaryScene scene={scene} />;
-  }
-
-  if (scene.type === "alerts") {
-    return <AlertsScene scene={scene} />;
-  }
-
-  if (scene.type === "actions") {
-    return <ActionsScene scene={scene} />;
-  }
-
-  return <ClosingScene scene={scene} />;
+  const C = sceneMap[scene.type] ?? ClosingScene;
+  return <C scene={scene} />;
 }
 
-export function DailyBriefVideo({ narrative }) {
-  const sequencedScenes = narrative.reduce(
-    (items, scene) => {
-      const previous = items.at(-1);
-      const from = previous ? previous.from + previous.durationInFrames : 0;
+/* ── Main Composition ────────────────────────────────────── */
 
-      return [...items, { ...scene, from }];
-    },
-    [],
-  );
+export function DailyBriefVideo({ narrative }) {
+  const sequenced = narrative.reduce((items, scene) => {
+    const prev = items.at(-1);
+    const from = prev ? prev.from + prev.durationInFrames : 0;
+    return [...items, { ...scene, from }];
+  }, []);
 
   return (
     <AbsoluteFill>
-      {sequencedScenes.map((scene) => (
-        <Sequence
-          key={scene.id}
-          from={scene.from}
-          durationInFrames={scene.durationInFrames}
-        >
+      {sequenced.map((scene) => (
+        <Sequence key={scene.id} from={scene.from} durationInFrames={scene.durationInFrames}>
           <RenderScene scene={scene} />
         </Sequence>
       ))}
     </AbsoluteFill>
   );
 }
-
-DailyBriefVideo.defaultProps = {
-  fps: DAILY_BRIEF_FPS,
-};

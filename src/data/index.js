@@ -5,3 +5,4 @@ export { mockCriticalAlerts } from "./mockCriticalAlerts";
 export { mockExecutiveKpis } from "./mockExecutiveKpis";
 export { mockInsightStories } from "./mockInsightStories";
 export { mockPriorityActions } from "./mockPriorityActions";
+export { mockDailyBriefData } from "./mockDailyBriefData";

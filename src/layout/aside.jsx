@@ -1,6 +1,14 @@
+import { useState } from "react";
 import * as FaIcons from "react-icons/fa6";
-import { FaXmark } from "react-icons/fa6";
+import { FaChevronDown, FaChevronUp, FaXmark } from "react-icons/fa6";
 import menuItems from "../menu.json";
+
+const dailyBriefSubItems = [
+  { name: "Total score", url: "/#total-score" },
+  { name: "Critical alerts", url: "/#critical-alerts" },
+  { name: "Top risk and opportunities", url: "/#risks-opportunities" },
+  { name: "Due today", url: "/#due-today" },
+];
 
 function MenuIcon({ name }) {
   const Icon = FaIcons[name] ?? FaIcons.FaCircle;
@@ -10,6 +18,7 @@ function MenuIcon({ name }) {
 
 function Aside({ isOpen = false, onClose }) {
   const currentPath = window.location.pathname;
+  const [isDailyBriefOpen, setIsDailyBriefOpen] = useState(true);
 
   return (
     <>
@@ -57,28 +66,69 @@ function Aside({ isOpen = false, onClose }) {
           const isActive = currentPath === item.url;
 
           return (
-            <a
-              key={item.name}
-              className={
-                isActive
-                  ? "flex items-center gap-3 rounded-xl bg-cyan-500/20 px-3 py-3 text-sm font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.09)]"
-                  : "flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-blue-100/80 transition hover:bg-white/8 hover:text-white"
-              }
-              href={item.url}
-              aria-current={isActive ? "page" : undefined}
-              onClick={onClose}
-            >
-              <span
-                className={
-                  isActive
-                    ? "grid h-8 w-8 place-items-center rounded-lg bg-cyan-400 text-slate-950"
-                    : "grid h-8 w-8 place-items-center rounded-lg bg-white/8 text-cyan-100"
-                }
-              >
-                <MenuIcon name={item.icon} />
-              </span>
-              <span>{item.name}</span>
-            </a>
+            <div key={item.name}>
+              <div className="flex items-center gap-2">
+                <a
+                  className={
+                    isActive
+                      ? "flex min-w-0 flex-1 items-center gap-3 rounded-xl bg-cyan-500/20 px-3 py-3 text-sm font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.09)]"
+                      : "flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-blue-100/80 transition hover:bg-white/8 hover:text-white"
+                  }
+                  href={item.url}
+                  aria-current={isActive ? "page" : undefined}
+                  onClick={onClose}
+                >
+                  <span
+                    className={
+                      isActive
+                        ? "grid h-8 w-8 place-items-center rounded-lg bg-cyan-400 text-slate-950"
+                        : "grid h-8 w-8 place-items-center rounded-lg bg-white/8 text-cyan-100"
+                    }
+                  >
+                    <MenuIcon name={item.icon} />
+                  </span>
+                  <span className="truncate">{item.name}</span>
+                </a>
+
+                {item.name === "Daily Brief" ? (
+                  <button
+                    className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/8 text-cyan-100 transition hover:bg-white/12 hover:text-white"
+                    type="button"
+                    aria-expanded={isDailyBriefOpen}
+                    aria-label={
+                      isDailyBriefOpen
+                        ? "Collapse Daily Brief menu"
+                        : "Expand Daily Brief menu"
+                    }
+                    onClick={() => setIsDailyBriefOpen((value) => !value)}
+                  >
+                    {isDailyBriefOpen ? (
+                      <FaChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : (
+                      <FaChevronDown
+                        className="h-3.5 w-3.5"
+                        aria-hidden="true"
+                      />
+                    )}
+                  </button>
+                ) : null}
+              </div>
+
+              {item.name === "Daily Brief" && isDailyBriefOpen ? (
+                <div className="ml-11 mt-2 grid gap-1 border-l border-white/10 pl-3">
+                  {dailyBriefSubItems.map((subItem) => (
+                    <a
+                      key={subItem.name}
+                      className="rounded-lg px-3 py-2 text-xs font-semibold text-blue-100/70 transition hover:bg-white/8 hover:text-white"
+                      href={subItem.url}
+                      onClick={onClose}
+                    >
+                      {subItem.name}
+                    </a>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           );
         })}
       </nav>
