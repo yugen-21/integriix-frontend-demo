@@ -62,17 +62,17 @@ function DailyBriefVideoPlaceholder() {
   );
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-white/80 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-      <div className="flex flex-wrap items-start justify-between gap-4 p-6">
-        <div>
+    <section className="min-w-0 overflow-hidden rounded-3xl border border-white/80 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.08)] max-[520px]:rounded-2xl">
+      <div className="flex flex-wrap items-start justify-between gap-4 p-6 max-[520px]:p-4">
+        <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-normal text-cyan-700">
             Daily Brief Video
           </p>
-          <h2 className="mt-3 text-2xl font-black leading-tight text-slate-950">
+          <h2 className="mt-3 text-2xl font-black leading-tight text-slate-950 max-[520px]:text-xl">
             Executive video briefing
           </h2>
         </div>
-        <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-600">
+        <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-600 max-[520px]:px-3">
           {audioState === "loading" && "Generating voiceover"}
           {audioState === "ready" && "Audio ready"}
           {audioState === "error" && "Audio unavailable"}
@@ -80,12 +80,12 @@ function DailyBriefVideoPlaceholder() {
       </div>
 
       {audioState === "error" && (
-        <div className="mx-6 mb-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+        <div className="mx-6 mb-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 max-[520px]:mx-4">
           {audioError}
         </div>
       )}
 
-      <div className="mx-6 mb-6 overflow-hidden rounded-2xl border border-slate-200">
+      <div className="mx-6 mb-6 min-w-0 overflow-hidden rounded-2xl border border-slate-200 max-[520px]:mx-4 max-[520px]:mb-4">
         <Player
           component={DailyBriefVideo}
           inputProps={{

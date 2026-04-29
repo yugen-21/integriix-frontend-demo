@@ -39,7 +39,7 @@ function RiskLadder({ risks, selectedId, onSelect }) {
           return (
             <button
               key={risk.id}
-              className={`grid grid-cols-[32px_minmax(0,1fr)_56px] items-center gap-3 rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md ${
+              className={`grid grid-cols-[24px_minmax(0,1fr)_48px] items-center gap-2 rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md min-[521px]:grid-cols-[32px_minmax(0,1fr)_56px] min-[521px]:gap-3 ${
                 isSelected
                   ? "border-red-200 bg-red-50 shadow-sm"
                   : "border-slate-100 bg-slate-50/80"
@@ -51,7 +51,7 @@ function RiskLadder({ risks, selectedId, onSelect }) {
                 {index + 1}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-sm text-slate-950">
+                <span className="block break-words text-sm text-slate-950">
                   {risk.name}
                 </span>
                 <span className="mt-2 block h-2 overflow-hidden rounded-full bg-white ring-1 ring-slate-200">
@@ -257,8 +257,8 @@ function RisksAndWinsBoard({ risks, wins }) {
   });
 
   return (
-    <section className="rounded-3xl border border-white/80 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-      <div className="grid gap-6 xl:grid-cols-2">
+    <section className="min-w-0 rounded-3xl border border-white/80 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] max-[520px]:rounded-2xl max-[520px]:p-4">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-2">
         <RiskLadder
           risks={risks}
           selectedId={selection.type === "risk" ? selection.id : null}

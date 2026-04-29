@@ -4,9 +4,9 @@ function OverallStatusHeroCard({ status }) {
   const statusStyle = ragStyles[status.ragStatus] ?? ragStyles.Amber;
 
   return (
-    <section className="rounded-3xl border border-white/80 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-      <div className="flex items-start justify-between gap-4">
-        <div>
+    <section className="min-w-0 rounded-3xl border border-white/80 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)] max-[520px]:rounded-2xl max-[520px]:p-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-normal text-cyan-700">
             Overall status
           </p>
@@ -21,13 +21,13 @@ function OverallStatusHeroCard({ status }) {
         </span>
       </div>
 
-      <div className={`mt-5 rounded-3xl ${statusStyle.panel} p-5`}>
-        <div className="flex items-end justify-between gap-5">
+      <div className={`mt-5 rounded-3xl ${statusStyle.panel} p-5 max-[520px]:rounded-2xl max-[520px]:p-4`}>
+        <div className="flex flex-wrap items-end justify-between gap-5">
           <div>
             <p className="text-xs font-bold uppercase text-slate-500">
               Weighted score
             </p>
-            <p className="mt-1 text-6xl font-black leading-none text-slate-950">
+            <p className="mt-1 text-6xl font-black leading-none text-slate-950 max-[520px]:text-5xl">
               {status.score}
             </p>
           </div>

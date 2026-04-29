@@ -29,13 +29,13 @@ function UpcomingDeadlines({ deadlines, day }) {
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 
   return (
-    <section className="rounded-3xl border border-white/80 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+    <section className="min-w-0 rounded-3xl border border-white/80 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] max-[520px]:rounded-2xl max-[520px]:p-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs font-bold uppercase tracking-normal text-cyan-700">
             Upcoming deadlines, audits, submissions
           </p>
-          <h2 className="mt-2 text-3xl font-black leading-tight text-slate-950">
+          <h2 className="mt-2 text-3xl font-black leading-tight text-slate-950 max-[520px]:text-2xl">
             Due today
           </h2>
         </div>
@@ -48,7 +48,7 @@ function UpcomingDeadlines({ deadlines, day }) {
         {todaysDeadlines.map((deadline) => (
           <article
             key={deadline.id}
-            className="grid gap-4 rounded-3xl border border-slate-100 bg-slate-50/80 p-5 md:grid-cols-[110px_minmax(0,1fr)_260px]"
+            className="grid min-w-0 gap-4 rounded-3xl border border-slate-100 bg-slate-50/80 p-5 md:grid-cols-[110px_minmax(0,1fr)_260px] max-[520px]:rounded-2xl max-[520px]:p-4"
           >
             <div>
               <p className="text-xs font-black uppercase text-slate-500">

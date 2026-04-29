@@ -54,10 +54,10 @@ function WeightedStatusDonut({ status }) {
   }, []);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+    <div className="grid min-w-0 gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
       <div className="relative grid place-items-center">
         <svg
-          className="h-56 w-56"
+          className="h-56 w-56 max-[520px]:h-48 max-[520px]:w-48"
           viewBox="0 0 260 260"
           role="img"
           aria-label="Weighted enterprise status donut chart"
@@ -89,7 +89,7 @@ function WeightedStatusDonut({ status }) {
         </svg>
         <div className="absolute text-center">
           <p className="text-xs font-bold uppercase text-slate-500">Score</p>
-          <p className="text-5xl font-black leading-none text-slate-950">
+          <p className="text-5xl font-black leading-none text-slate-950 max-[520px]:text-4xl">
             {status.score}
           </p>
           <p className="mt-1 text-sm font-black text-amber-700">

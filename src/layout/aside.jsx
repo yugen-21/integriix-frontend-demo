@@ -37,8 +37,8 @@ function Aside({ isOpen = false, onClose }) {
       <aside
         className={
           isOpen
-            ? "fixed inset-y-0 left-0 z-50 w-1/2 min-w-[260px] overflow-hidden bg-[#08243d] px-5 py-6 text-blue-100 shadow-[18px_0_45px_rgba(8,36,61,0.24)] transition-transform duration-300 max-[900px]:translate-x-0 min-[901px]:sticky min-[901px]:top-0 min-[901px]:z-auto min-[901px]:h-svh min-[901px]:w-auto min-[901px]:min-w-0"
-            : "sticky top-0 h-svh overflow-hidden bg-[#08243d] px-5 py-6 text-blue-100 shadow-[18px_0_45px_rgba(8,36,61,0.24)] transition-transform duration-300 max-[900px]:fixed max-[900px]:inset-y-0 max-[900px]:left-0 max-[900px]:z-50 max-[900px]:w-1/2 max-[900px]:min-w-[260px] max-[900px]:-translate-x-full"
+            ? "fixed inset-y-0 left-0 z-50 w-1/2 min-w-[260px] overflow-x-hidden overflow-y-auto bg-[#08243d] px-5 py-6 text-blue-100 shadow-[18px_0_45px_rgba(8,36,61,0.24)] transition-transform duration-300 max-[900px]:translate-x-0 min-[901px]:sticky min-[901px]:top-0 min-[901px]:z-auto min-[901px]:h-svh min-[901px]:w-auto min-[901px]:min-w-0"
+            : "sticky top-0 h-svh overflow-x-hidden overflow-y-auto bg-[#08243d] px-5 py-6 text-blue-100 shadow-[18px_0_45px_rgba(8,36,61,0.24)] transition-transform duration-300 max-[900px]:fixed max-[900px]:inset-y-0 max-[900px]:left-0 max-[900px]:z-50 max-[900px]:w-1/2 max-[900px]:min-w-[260px] max-[900px]:-translate-x-full"
         }
         aria-label="Dashboard navigation"
         aria-hidden={!isOpen ? undefined : false}
@@ -88,7 +88,7 @@ function Aside({ isOpen = false, onClose }) {
                     >
                       <MenuIcon name={item.icon} />
                     </span>
-                    <span className="truncate">{item.name}</span>
+                    <span className="break-words">{item.name}</span>
                   </a>
 
                   {item.name === "Daily Brief" ? (

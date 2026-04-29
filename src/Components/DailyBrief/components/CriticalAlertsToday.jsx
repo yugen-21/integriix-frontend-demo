@@ -29,15 +29,15 @@ function CriticalAlertsToday({ alerts }) {
     severityStyles[primaryAlert.severity] ?? severityStyles.Medium;
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-white/80 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-      <div className="grid gap-5 p-6 xl:grid-cols-[minmax(320px,0.8fr)_minmax(0,1.2fr)]">
-        <div>
-          <div className="flex items-start justify-between gap-4">
-            <div>
+    <section className="min-w-0 overflow-hidden rounded-3xl border border-white/80 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.08)] max-[520px]:rounded-2xl">
+      <div className="grid min-w-0 gap-5 p-6 xl:grid-cols-[minmax(320px,0.8fr)_minmax(0,1.2fr)] max-[520px]:p-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-normal text-red-700">
                 Critical alerts
               </p>
-              <h2 className="mt-2 text-3xl font-black leading-tight text-slate-950">
+              <h2 className="mt-2 text-3xl font-black leading-tight text-slate-950 max-[520px]:text-2xl">
                 Action queue for today
               </h2>
             </div>
@@ -66,15 +66,15 @@ function CriticalAlertsToday({ alerts }) {
                       className={`h-3 w-3 shrink-0 rounded-full ${style.dot}`}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-black text-slate-950">
+                      <p className="break-words text-sm font-black text-slate-950">
                         {alert.title}
                       </p>
-                      <p className="mt-1 truncate text-xs font-semibold text-slate-500">
+                      <p className="mt-1 break-words text-xs font-semibold leading-5 text-slate-500">
                         {alert.location} · Owner: {alert.owner}
                       </p>
                     </div>
                     <span
-                      className={`rounded-full px-2 py-1 text-[11px] font-black ring-1 ${style.badge}`}
+                      className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-black ring-1 ${style.badge}`}
                     >
                       {alert.severity}
                     </span>
@@ -86,14 +86,14 @@ function CriticalAlertsToday({ alerts }) {
         </div>
 
         <div
-          className={`rounded-3xl border ${primaryStyle.border} ${primaryStyle.panel} p-5`}
+          className={`min-w-0 rounded-3xl border ${primaryStyle.border} ${primaryStyle.panel} p-5 max-[520px]:rounded-2xl max-[520px]:p-4`}
         >
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-black uppercase text-slate-500">
                 Selected priority alert
               </p>
-              <h3 className="mt-2 text-2xl font-black leading-tight text-slate-950">
+              <h3 className="mt-2 text-2xl font-black leading-tight text-slate-950 max-[520px]:text-xl">
                 {primaryAlert.title}
               </h3>
             </div>
@@ -104,45 +104,45 @@ function CriticalAlertsToday({ alerts }) {
             </span>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl bg-white/80 p-4 ring-1 ring-white">
+          <div className="mt-5 grid min-w-0 gap-3 sm:grid-cols-3">
+            <div className="min-w-0 rounded-2xl bg-white/80 p-4 ring-1 ring-white max-[520px]:p-3">
               <p className="text-xs font-bold uppercase text-slate-500">
                 Unit / area
               </p>
-              <p className="mt-1 text-sm font-black text-slate-950">
+              <p className="mt-1 break-words text-sm font-black text-slate-950">
                 {primaryAlert.location}
               </p>
             </div>
-            <div className="rounded-2xl bg-white/80 p-4 ring-1 ring-white">
+            <div className="min-w-0 rounded-2xl bg-white/80 p-4 ring-1 ring-white max-[520px]:p-3">
               <p className="text-xs font-bold uppercase text-slate-500">
                 Owner
               </p>
-              <p className="mt-1 text-sm font-black text-slate-950">
+              <p className="mt-1 break-words text-sm font-black text-slate-950">
                 {primaryAlert.owner}
               </p>
             </div>
-            <div className="rounded-2xl bg-white/80 p-4 ring-1 ring-white">
+            <div className="min-w-0 rounded-2xl bg-white/80 p-4 ring-1 ring-white max-[520px]:p-3">
               <p className="text-xs font-bold uppercase text-slate-500">Due</p>
-              <p className="mt-1 text-sm font-black text-slate-950">
+              <p className="mt-1 break-words text-sm font-black text-slate-950">
                 {primaryAlert.due}
               </p>
             </div>
           </div>
 
-          <div className="mt-5 rounded-2xl bg-white/80 p-4 ring-1 ring-white">
+          <div className="mt-5 min-w-0 rounded-2xl bg-white/80 p-4 ring-1 ring-white max-[520px]:p-3">
             <p className="text-xs font-black uppercase text-slate-500">
               Why it qualifies
             </p>
-            <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+            <p className="mt-2 break-words text-sm font-semibold leading-6 text-slate-600">
               {primaryAlert.qualifiesAs}. {primaryAlert.summary}
             </p>
           </div>
 
-          <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-white">
+          <div className="mt-4 min-w-0 rounded-2xl bg-white p-4 ring-1 ring-white max-[520px]:p-3">
             <p className="text-xs font-black uppercase text-cyan-700">
               Required action
             </p>
-            <p className="mt-2 text-base font-black leading-6 text-slate-900">
+            <p className="mt-2 break-words text-base font-black leading-6 text-slate-900 max-[520px]:text-sm">
               {primaryAlert.requiredAction}
             </p>
           </div>

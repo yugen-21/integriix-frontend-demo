@@ -12,7 +12,7 @@ function DailyBrief() {
   const organizationStatus = mockDailyBriefData.organizationStatus;
 
   return (
-    <div className="grid gap-6">
+    <div className="grid min-w-0 gap-6 max-[900px]:gap-4">
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.55fr)]">
         <DailyBriefVideoPlaceholder />
         <OverallStatusHeroCard status={organizationStatus} />

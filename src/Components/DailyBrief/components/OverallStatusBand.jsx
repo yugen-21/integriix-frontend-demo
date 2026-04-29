@@ -7,14 +7,14 @@ function OverallStatusBand({ status }) {
   const pushingUp = status.driversPushingUp.slice(0, 2);
 
   return (
-    <section className="overflow-hidden rounded-3xl border border-white/80 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
-      <div className="bg-[linear-gradient(135deg,#ffffff_0%,#eef9fc_54%,#f8fbfd_100%)] p-6">
+    <section className="min-w-0 overflow-hidden rounded-3xl border border-white/80 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.10)] max-[520px]:rounded-2xl">
+      <div className="bg-[linear-gradient(135deg,#ffffff_0%,#eef9fc_54%,#f8fbfd_100%)] p-6 max-[520px]:p-4">
         <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-normal text-cyan-700">
               Overall organization status
             </p>
-            <h2 className="mt-2 text-3xl font-black leading-tight text-slate-950">
+            <h2 className="mt-2 text-3xl font-black leading-tight text-slate-950 max-[520px]:text-2xl">
               Enterprise health roll-up
             </h2>
           </div>
@@ -25,7 +25,7 @@ function OverallStatusBand({ status }) {
           </span>
         </div>
 
-        <div className="mt-5 rounded-3xl border border-slate-100 bg-white/80 p-5 shadow-sm">
+        <div className="mt-5 min-w-0 rounded-3xl border border-slate-100 bg-white/80 p-5 shadow-sm max-[520px]:rounded-2xl max-[520px]:p-4">
           <WeightedStatusDonut status={status} />
         </div>
 

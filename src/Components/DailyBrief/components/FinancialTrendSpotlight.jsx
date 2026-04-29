@@ -1,24 +1,19 @@
 import {
   FaArrowTrendUp,
   FaClipboardCheck,
-  FaSackDollar,
 } from "react-icons/fa6";
 
 function FinancialTrendSpotlight({ trend }) {
-  const maxPoint = Math.max(...trend.points);
-  const minPoint = Math.min(...trend.points);
-  const pointRange = Math.max(maxPoint - minPoint, 1);
-
   return (
-    <section className="overflow-hidden rounded-3xl border border-white/80 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-      <div className="p-6">
+    <section className="min-w-0 overflow-hidden rounded-3xl border border-white/80 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.08)] max-[520px]:rounded-2xl">
+      <div className="p-6 max-[520px]:p-4">
         <div>
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-bold uppercase tracking-normal text-cyan-700">
                 Key financial trend
               </p>
-              <h2 className="mt-2 text-3xl font-black leading-tight text-slate-950">
+              <h2 className="mt-2 text-3xl font-black leading-tight text-slate-950 max-[520px]:text-2xl">
                 {trend.title}
               </h2>
             </div>
