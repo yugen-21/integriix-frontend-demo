@@ -118,7 +118,7 @@ export const mockDailyBriefData = {
     score: organizationScore,
     ragStatus: getRagStatus(organizationScore),
     executiveSummary:
-      "The organization is in amber status today. Safety, accreditation evidence, and operational flow need leadership attention, while training completion and CAPA closure are improving the overall position.",
+      "The organization is in amber status today. Safety, accreditation evidence, operational flow, and revenue leakage from claims denials need leadership attention, while training completion and CAPA closure are improving the overall position.",
     dimensions: enterpriseDimensions.map((dimension) => ({
       ...dimension,
       ragStatus: getRagStatus(dimension.score),
@@ -145,6 +145,13 @@ export const mockDailyBriefData = {
         reason:
           "Order-to-bed-release time is 3.8 hours above target, increasing ER boarding risk.",
       },
+      {
+        title: "High-value denials yesterday",
+        dimension: "Financial Controls",
+        impact: "-3 pts",
+        reason:
+          "Denial rate rose to 9.1%, with one high-value denial carrying $150 revenue at risk pending review.",
+      },
     ],
     driversPushingUp: [
       {
@@ -162,6 +169,29 @@ export const mockDailyBriefData = {
           "Quality team closed 18 lower-risk CAPAs over the last seven days.",
       },
     ],
+  },
+
+  financialTrend: {
+    title: "Revenue leakage from claims denials",
+    metricLabel: "Denial rate",
+    currentValue: "9.1%",
+    previousValue: "6.4%",
+    movement: "+2.7 pts",
+    status: "Worsening",
+    revenueAtRisk: "$150",
+    timeWindow: "Yesterday",
+    highValueDenials: 1,
+    department: "Cardiology",
+    sourceModule: "Revenue Cycle",
+    whatChanged:
+      "Cardiology denial rate increased from 6.4% to 9.1% yesterday.",
+    impact:
+      "One high-value denial is holding $150 of recoverable revenue and may indicate a repeat authorization control gap.",
+    recommendedAction:
+      "Revisit the denied claim, confirm the authorization/documentation mismatch, and assign recovery ownership before the finance checkpoint.",
+    owner: "Chief Financial Officer",
+    due: "Tomorrow 11:00",
+    points: [6.1, 6.4, 6.8, 7.2, 7.9, 8.5, 9.1],
   },
 
   criticalAlertsToday: [
@@ -219,9 +249,9 @@ export const mockDailyBriefData = {
       owner: "Chief Financial Officer",
       sourceModule: "Revenue Cycle",
       summary:
-        "Denials increased to 9.1% after authorization and documentation mismatch spike.",
+        "Denials increased to 9.1% after authorization and documentation mismatch spike, including one high-value denial with $150 revenue at risk.",
       requiredAction:
-        "Sample denied claims, confirm authorization control failure, and brief service leadership.",
+        "Revisit the high-value denial, confirm authorization control failure, and brief service leadership.",
       due: "Tomorrow 11:00",
       escalation: "Finance risk committee if denial recovery plan is not assigned.",
     },

@@ -15,7 +15,13 @@ function voiceoverDuration(text, fps = DAILY_BRIEF_FPS) {
 }
 
 export function buildDailyBriefNarrative() {
-  const { meta, organizationStatus, criticalAlertsToday, upcomingDeadlines } = mockDailyBriefData;
+  const {
+    meta,
+    organizationStatus,
+    criticalAlertsToday,
+    upcomingDeadlines,
+    financialTrend,
+  } = mockDailyBriefData;
 
   const todayDeadlines = upcomingDeadlines.filter((d) => {
     const dl = new Date(d.date);
@@ -85,6 +91,14 @@ export function buildDailyBriefNarrative() {
       voiceover: `There are ${topAlerts.length} critical alerts requiring leadership attention. ${topAlerts.slice(0, 3).map((a) => `${a.title} in ${a.location}, severity ${a.severity}. ${a.summary}`).join(" ")}`,
     },
     {
+      id: "scene-financial-trend",
+      type: "financialTrend",
+      eyebrow: "Financial Trend",
+      title: "Denial leakage needs revenue protection",
+      trend: financialTrend,
+      voiceover: `The key financial trend is claims denial leakage. ${financialTrend.whatChanged} ${financialTrend.highValueDenials} high-value denial from ${financialTrend.timeWindow.toLowerCase()} carries ${financialTrend.revenueAtRisk} of recoverable revenue at risk. Recommended action: ${financialTrend.recommendedAction}`,
+    },
+    {
       id: "scene-due-today",
       type: "dueToday",
       eyebrow: "Due Today",
@@ -114,7 +128,7 @@ export function buildDailyBriefNarrative() {
       score: organizationStatus.score,
       ragStatus: organizationStatus.ragStatus,
       briefOwner: meta.briefOwner,
-      voiceover: "This concludes the executive briefing. Focus today on medication safety escalation, accreditation evidence closure, operational throughput, and revenue protection. Thank you.",
+      voiceover: `This concludes the executive briefing. Focus today on medication safety escalation, accreditation evidence closure, operational throughput, and revenue protection. Revisit the high-value denial carrying ${financialTrend.revenueAtRisk} at risk before the finance checkpoint. Thank you.`,
     },
   ];
 

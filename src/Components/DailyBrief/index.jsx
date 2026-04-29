@@ -1,6 +1,7 @@
 import { mockDailyBriefData } from "../../data";
 import CriticalAlertsToday from "./components/CriticalAlertsToday";
 import DailyBriefVideoPlaceholder from "./components/DailyBriefVideoPlaceholder";
+import FinancialTrendSpotlight from "./components/FinancialTrendSpotlight";
 import OverallStatusBand from "./components/OverallStatusBand";
 import OverallStatusHeroCard from "./components/OverallStatusHeroCard";
 import RisksAndWinsBoard from "./components/RisksAndWinsBoard";
@@ -18,6 +19,10 @@ function DailyBrief() {
       </section>
 
       <TrendCards />
+
+      <section id="financial-trend" className="scroll-mt-28">
+        <FinancialTrendSpotlight trend={mockDailyBriefData.financialTrend} />
+      </section>
 
       <section id="total-score" className="scroll-mt-28">
         <OverallStatusBand status={organizationStatus} />

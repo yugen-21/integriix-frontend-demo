@@ -179,6 +179,72 @@ function AlertsScene({ scene }) {
   );
 }
 
+/* ── 5. Financial Trend Scene ────────────────────────────── */
+
+function FinancialTrendScene({ scene }) {
+  const frame = useCurrentFrame();
+  const trend = scene.trend;
+  const maxPoint = Math.max(...trend.points);
+  const minPoint = Math.min(...trend.points);
+  const pointRange = Math.max(maxPoint - minPoint, 1);
+
+  return (
+    <SceneFrame eyebrow={scene.eyebrow} title={scene.title} variant="light" voiceover={scene.voiceover}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 620px", gap: 44, marginTop: 38, alignItems: "stretch" }}>
+        <div style={{ display: "grid", gap: 22 }}>
+          {[
+            { label: trend.metricLabel, value: trend.currentValue, detail: `${trend.movement} vs prior day`, tone: "#dc2626" },
+            { label: "Revenue at risk", value: trend.revenueAtRisk, detail: `${trend.highValueDenials} high-value denial yesterday`, tone: "#0e7490" },
+            { label: "Owner", value: trend.owner, detail: `Due ${trend.due}`, tone: "#0f172a" },
+          ].map((item, i) => {
+            const reveal = interpolate(frame, [i * 16, i * 16 + 36], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+
+            return (
+              <div key={item.label} style={{
+                opacity: reveal, transform: `translateX(${(1 - reveal) * 30}px)`,
+                background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 22,
+                padding: "26px 30px", boxShadow: "0 6px 24px rgba(15,23,42,0.05)",
+              }}>
+                <div style={{ color: "#64748b", fontSize: 18, fontWeight: 900, textTransform: "uppercase" }}>{item.label}</div>
+                <div style={{ color: item.tone, fontSize: 54, fontWeight: 950, lineHeight: 1, marginTop: 10 }}>{item.value}</div>
+                <div style={{ color: "#475569", fontSize: 22, fontWeight: 800, marginTop: 10 }}>{item.detail}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ background: "#0f172a", borderRadius: 28, color: "#fff", padding: 34 }}>
+          <div style={{ color: "#67e8f9", fontSize: 18, fontWeight: 900, textTransform: "uppercase" }}>{trend.department} · {trend.sourceModule}</div>
+          <div style={{ color: "#fff", fontSize: 30, fontWeight: 950, lineHeight: 1.15, marginTop: 10 }}>{trend.whatChanged}</div>
+          <div style={{ display: "flex", alignItems: "end", gap: 12, height: 260, marginTop: 34 }}>
+            {trend.points.map((point, i) => {
+              const reveal = interpolate(frame, [30 + i * 10, 58 + i * 10], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+              const height = 70 + ((point - minPoint) / pointRange) * 180;
+
+              return (
+                <div key={`${point}-${i}`} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, alignItems: "center", justifyContent: "end" }}>
+                  <div style={{
+                    background: i === trend.points.length - 1 ? "#f87171" : "#22d3ee",
+                    borderRadius: "14px 14px 4px 4px", height: height * reveal, width: "100%",
+                  }} />
+                  <div style={{ color: "#94a3b8", fontSize: 15, fontWeight: 900 }}>D-{trend.points.length - i - 1}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{
+            background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 20, color: "#e2e8f0", fontSize: 22, fontWeight: 800,
+            lineHeight: 1.35, marginTop: 28, padding: "22px 24px",
+          }}>
+            {trend.recommendedAction}
+          </div>
+        </div>
+      </div>
+    </SceneFrame>
+  );
+}
+
 /* ── 5. Due Today Scene ──────────────────────────────────── */
 
 function DueTodayScene({ scene }) {
@@ -291,7 +357,7 @@ function ClosingScene({ scene }) {
 
 /* ── Scene Router ────────────────────────────────────────── */
 
-const sceneMap = { title: TitleScene, driversDown: DriversDownScene, driversUp: DriversUpScene, alerts: AlertsScene, dueToday: DueTodayScene, actions: ActionsScene, closing: ClosingScene };
+const sceneMap = { title: TitleScene, driversDown: DriversDownScene, driversUp: DriversUpScene, alerts: AlertsScene, financialTrend: FinancialTrendScene, dueToday: DueTodayScene, actions: ActionsScene, closing: ClosingScene };
 
 function RenderScene({ scene }) {
   const C = sceneMap[scene.type] ?? ClosingScene;

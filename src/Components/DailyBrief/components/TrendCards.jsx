@@ -38,9 +38,9 @@ const trendCards = [
     Icon: FaClockRotateLeft,
   },
   {
-    name: "Financial Leakage",
-    trend: "AED 154K",
-    description: "Financial leakage detected for review.",
+    name: "Denial Leakage",
+    trend: "$150",
+    description: "High-value denial from yesterday needs CFO review.",
     tone: "pale",
     Icon: FaSackDollar,
   },
