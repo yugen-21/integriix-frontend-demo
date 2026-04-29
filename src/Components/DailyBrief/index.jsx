@@ -20,7 +20,8 @@ function DailyBrief() {
 
       <TrendCards />
 
-      <section id="financial-trend" className="scroll-mt-28">
+      <section id="key-financial-trend" className="scroll-mt-28">
+        <span id="financial-trend" className="sr-only" aria-hidden="true" />
         <FinancialTrendSpotlight trend={mockDailyBriefData.financialTrend} />
       </section>
 

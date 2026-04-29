@@ -39,7 +39,7 @@ const trendCards = [
   },
   {
     name: "Denial Leakage",
-    trend: "$150",
+    trend: "$42,000",
     description: "High-value denial from yesterday needs CFO review.",
     tone: "pale",
     Icon: FaSackDollar,
