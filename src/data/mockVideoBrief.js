@@ -29,14 +29,21 @@ export const mockVideoBrief = {
     },
     {
       id: "chapter-004",
-      title: "Financial and Compliance Exposure",
+      title: "Financial Trend Spotlight",
       startTime: "02:58",
+      duration: "00:48",
+      focus: "Claims denial movement, revenue at risk, accountable owner, and recovery action.",
+    },
+    {
+      id: "chapter-005",
+      title: "Compliance Exposure",
+      startTime: "03:46",
       duration: "01:20",
-      focus: "Claims denials, overdue audit evidence, and procurement controls.",
+      focus: "Overdue audit evidence, accreditation readiness, and procurement controls.",
     },
   ],
   scriptPreview:
-    "Good morning. Riverside's governance score is 82, placing the hospital at moderate risk. The most time-sensitive risks are medication safety escalation in medical wards, infection control review in ICU, and delayed audit evidence for accreditation readiness.",
+    "Good morning. Riverside's governance score is 82, placing the hospital at moderate risk. The most time-sensitive risks are medication safety escalation in medical wards, infection control review in ICU, claims denial leakage in Cardiology, and delayed audit evidence for accreditation readiness.",
   narrativeScenes: [
     {
       id: "scene-001",
@@ -74,10 +81,23 @@ export const mockVideoBrief = {
     },
     {
       id: "scene-004",
+      type: "financial-trend",
+      durationInFrames: 180,
+      voiceover:
+        "The financial trend spotlight is claims denial leakage. Cardiology denial rate increased from 6.4 percent to 9.1 percent yesterday, with one high-value denial carrying 150 dollars of recoverable revenue at risk. The finance action is to confirm the authorization and documentation mismatch and assign recovery ownership before tomorrow's checkpoint.",
+      visual: {
+        trendId: "financial-trend",
+        metric: "Denial rate 9.1%",
+        revenueAtRisk: "$150",
+        owner: "Chief Financial Officer",
+      },
+    },
+    {
+      id: "scene-005",
       type: "action-summary",
       durationInFrames: 180,
       voiceover:
-        "Leadership attention should focus on immediate safety huddles, audit evidence closure, and revenue cycle denial review.",
+        "Leadership attention should focus on immediate safety huddles, revenue cycle denial recovery, and audit evidence closure.",
       visual: {
         actionIds: ["action-001", "action-002", "action-004"],
         closingLabel: "Priority actions due today",

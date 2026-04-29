@@ -6,12 +6,26 @@ export const DAILY_BRIEF_HEIGHT = 1080;
 
 const WORDS_PER_MINUTE = 138;
 const ENTRANCE_BUFFER_FRAMES = 60; // 2s for animations before narration starts
-const EXIT_BUFFER_FRAMES = 30;     // 1s pause after narration ends
+const EXIT_BUFFER_FRAMES = 30; // 1s pause after narration ends
+
+export const DAILY_BRIEF_VOICEOVER_START_FRAME = ENTRANCE_BUFFER_FRAMES;
+export const DAILY_BRIEF_VOICEOVER_EXIT_FRAMES = EXIT_BUFFER_FRAMES;
 
 function voiceoverDuration(text, fps = DAILY_BRIEF_FPS) {
   const words = text.split(/\s+/).filter(Boolean).length;
   const speakingFrames = Math.ceil((words / WORDS_PER_MINUTE) * 60 * fps);
   return speakingFrames + ENTRANCE_BUFFER_FRAMES + EXIT_BUFFER_FRAMES;
+}
+
+function buildFinancialTrendVoiceover(trend) {
+  return [
+    `The financial trend spotlight is ${trend.title}.`,
+    `${trend.whatChanged}`,
+    `${trend.impact}`,
+    `${trend.highValueDenials} high-value denial from ${trend.timeWindow.toLowerCase()} carries ${trend.revenueAtRisk} of recoverable revenue at risk.`,
+    `Recommended action: ${trend.recommendedAction}`,
+    `Owner: ${trend.owner}. Due ${trend.due}.`,
+  ].join(" ");
 }
 
 export function buildDailyBriefNarrative() {
@@ -23,10 +37,16 @@ export function buildDailyBriefNarrative() {
     financialTrend,
   } = mockDailyBriefData;
 
+  const generatedAt = new Date();
+
   const todayDeadlines = upcomingDeadlines.filter((d) => {
     const dl = new Date(d.date);
-    const br = new Date(meta.generatedAt);
-    return dl.toDateString() === br.toDateString();
+    const mockBriefDate = new Date(meta.generatedAt);
+
+    return (
+      dl.toDateString() === generatedAt.toDateString() ||
+      dl.toDateString() === mockBriefDate.toDateString()
+    );
   });
 
   const topAlerts = criticalAlertsToday.slice(0, 5);
@@ -43,8 +63,11 @@ export function buildDailyBriefNarrative() {
       linkedAlert: a.title,
     }));
 
-  const dateStr = new Date(meta.generatedAt).toLocaleDateString("en-GB", {
-    weekday: "long", day: "numeric", month: "long", year: "numeric",
+  const dateStr = generatedAt.toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
   });
 
   const scenes = [
@@ -61,7 +84,7 @@ export function buildDailyBriefNarrative() {
       ragStatus: organizationStatus.ragStatus,
       executiveSummary: organizationStatus.executiveSummary,
       dimensions: organizationStatus.dimensions,
-      voiceover: `Good morning. This is the daily governance brief for ${meta.organizationName}. Today is ${dateStr}. The current governance score is ${organizationStatus.score} out of 100, placing the organization at ${organizationStatus.ragStatus} status. ${organizationStatus.executiveSummary}`,
+      voiceover: `Good morning. This is the daily governance brief for ${meta.organizationName}. Today is ${dateStr}. The current governance score is ${organizationStatus.score} out of 100. ${organizationStatus.executiveSummary}`,
     },
     {
       id: "scene-drivers-down",
@@ -85,18 +108,30 @@ export function buildDailyBriefNarrative() {
       eyebrow: "Critical Alerts",
       title: "Requiring leadership attention today",
       alerts: topAlerts.map((a) => ({
-        id: a.id, title: a.title, severity: a.severity, location: a.location,
-        owner: a.owner, summary: a.summary, due: a.due, sourceModule: a.sourceModule,
+        id: a.id,
+        title: a.title,
+        severity: a.severity,
+        location: a.location,
+        owner: a.owner,
+        summary: a.summary,
+        due: a.due,
+        sourceModule: a.sourceModule,
       })),
-      voiceover: `There are ${topAlerts.length} critical alerts requiring leadership attention. ${topAlerts.slice(0, 3).map((a) => `${a.title} in ${a.location}, severity ${a.severity}. ${a.summary}`).join(" ")}`,
+      voiceover: `There are ${topAlerts.length} critical alerts requiring leadership attention. ${topAlerts
+        .slice(0, 3)
+        .map(
+          (a) =>
+            `${a.title} in ${a.location}, severity ${a.severity}. ${a.summary}`,
+        )
+        .join(" ")}`,
     },
     {
       id: "scene-financial-trend",
       type: "financialTrend",
       eyebrow: "Financial Trend",
-      title: "Denial leakage needs revenue protection",
+      title: financialTrend.title,
       trend: financialTrend,
-      voiceover: `The key financial trend is claims denial leakage. ${financialTrend.whatChanged} ${financialTrend.highValueDenials} high-value denial from ${financialTrend.timeWindow.toLowerCase()} carries ${financialTrend.revenueAtRisk} of recoverable revenue at risk. Recommended action: ${financialTrend.recommendedAction}`,
+      voiceover: buildFinancialTrendVoiceover(financialTrend),
     },
     {
       id: "scene-due-today",
@@ -104,10 +139,17 @@ export function buildDailyBriefNarrative() {
       eyebrow: "Due Today",
       title: "Deadlines requiring completion",
       deadlines: todayDeadlines.map((d) => ({
-        id: d.id, title: d.title, type: d.type, owner: d.owner,
-        readinessStatus: d.readinessStatus, blockers: d.blockers,
+        id: d.id,
+        title: d.title,
+        type: d.type,
+        owner: d.owner,
+        readinessStatus: d.readinessStatus,
+        blockers: d.blockers,
         consequenceOfDelay: d.consequenceOfDelay,
-        time: new Date(d.date).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+        time: new Date(d.date).toLocaleTimeString("en-GB", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
       })),
       voiceover: `${todayDeadlines.length} deadlines require completion today. ${todayDeadlines.map((d) => `${d.title}, due at ${new Date(d.date).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}. Current readiness is ${d.readinessStatus}. ${d.consequenceOfDelay}`).join(" ")}`,
     },
@@ -124,7 +166,7 @@ export function buildDailyBriefNarrative() {
       type: "closing",
       eyebrow: "End of Brief",
       title: "Focus the day on safety, readiness, and flow.",
-      subtitle: `Briefing generated at ${new Date(meta.generatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`,
+      subtitle: `Briefing generated at ${generatedAt.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`,
       score: organizationStatus.score,
       ragStatus: organizationStatus.ragStatus,
       briefOwner: meta.briefOwner,

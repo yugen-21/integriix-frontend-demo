@@ -1,9 +1,10 @@
-import { AbsoluteFill, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
-import { AnimatedGauge, RadarChart, WaterfallChart, SeverityHeatGrid, TimelineVisual, HospitalFlowNetwork, VoiceoverCaption } from "./Visuals";
+import { AbsoluteFill, Audio, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { AnimatedGauge, RadarChart, WaterfallChart, SeverityHeatGrid, TimelineVisual, HospitalFlowNetwork } from "./Visuals";
+import { DAILY_BRIEF_VOICEOVER_START_FRAME } from "./narrativeBuilder";
 
 /* ── Scene Frame ─────────────────────────────────────────── */
 
-function SceneFrame({ eyebrow, title, children, variant = "dark", voiceover }) {
+function SceneFrame({ eyebrow, title, children, variant = "dark" }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const entrance = spring({ frame, fps, config: { damping: 18, stiffness: 95 } });
@@ -32,7 +33,6 @@ function SceneFrame({ eyebrow, title, children, variant = "dark", voiceover }) {
         <h1 style={{ fontSize: 68, lineHeight: 1.05, margin: "28px 0 0", maxWidth: 1300 }}>{title}</h1>
         {children}
       </div>
-      {voiceover && <VoiceoverCaption text={voiceover} variant={variant} />}
     </AbsoluteFill>
   );
 }
@@ -366,11 +366,11 @@ function RenderScene({ scene }) {
 
 /* ── Main Composition ────────────────────────────────────── */
 
-export function DailyBriefVideo({ narrative }) {
+export function DailyBriefVideo({ narrative, audioBySceneId = {} }) {
   const sequenced = narrative.reduce((items, scene) => {
     const prev = items.at(-1);
     const from = prev ? prev.from + prev.durationInFrames : 0;
-    return [...items, { ...scene, from }];
+    return [...items, { ...scene, audioSrc: audioBySceneId[scene.id], from }];
   }, []);
 
   return (
@@ -378,6 +378,11 @@ export function DailyBriefVideo({ narrative }) {
       {sequenced.map((scene) => (
         <Sequence key={scene.id} from={scene.from} durationInFrames={scene.durationInFrames}>
           <RenderScene scene={scene} />
+          {scene.audioSrc && (
+            <Sequence from={DAILY_BRIEF_VOICEOVER_START_FRAME}>
+              <Audio src={scene.audioSrc} />
+            </Sequence>
+          )}
         </Sequence>
       ))}
     </AbsoluteFill>
