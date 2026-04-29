@@ -150,7 +150,7 @@ export const mockDailyBriefData = {
         dimension: "Financial Controls",
         impact: "-3 pts",
         reason:
-          "Denial rate rose to 9.1%, with one high-value denial carrying $150 revenue at risk pending review.",
+          "Denial rate rose to 9.1%, with one high-value denial carrying $42,000 revenue at risk pending review.",
       },
     ],
     driversPushingUp: [
@@ -178,7 +178,7 @@ export const mockDailyBriefData = {
     previousValue: "6.4%",
     movement: "+2.7 pts",
     status: "Worsening",
-    revenueAtRisk: "$150",
+    revenueAtRisk: "$42,000",
     timeWindow: "Yesterday",
     highValueDenials: 1,
     department: "Cardiology",
@@ -186,7 +186,7 @@ export const mockDailyBriefData = {
     whatChanged:
       "Cardiology denial rate increased from 6.4% to 9.1% yesterday.",
     impact:
-      "One high-value denial is holding $150 of recoverable revenue and may indicate a repeat authorization control gap.",
+      "One high-value denial is holding $42,000 of recoverable revenue and may indicate a repeat authorization control gap.",
     recommendedAction:
       "Revisit the denied claim, confirm the authorization/documentation mismatch, and assign recovery ownership before the finance checkpoint.",
     owner: "Chief Financial Officer",
@@ -249,7 +249,7 @@ export const mockDailyBriefData = {
       owner: "Chief Financial Officer",
       sourceModule: "Revenue Cycle",
       summary:
-        "Denials increased to 9.1% after authorization and documentation mismatch spike, including one high-value denial with $150 revenue at risk.",
+        "Denials increased to 9.1% after authorization and documentation mismatch spike, including one high-value denial with $42,000 revenue at risk.",
       requiredAction:
         "Revisit the high-value denial, confirm authorization control failure, and brief service leadership.",
       due: "Tomorrow 11:00",

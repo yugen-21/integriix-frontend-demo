@@ -84,11 +84,11 @@ export const mockVideoBrief = {
       type: "financial-trend",
       durationInFrames: 180,
       voiceover:
-        "The financial trend spotlight is claims denial leakage. Cardiology denial rate increased from 6.4 percent to 9.1 percent yesterday, with one high-value denial carrying 150 dollars of recoverable revenue at risk. The finance action is to confirm the authorization and documentation mismatch and assign recovery ownership before tomorrow's checkpoint.",
+        "The financial trend spotlight is claims denial leakage. Cardiology denial rate increased from 6.4 percent to 9.1 percent yesterday, with one high-value denial carrying 42,000 dollars of recoverable revenue at risk. The finance action is to confirm the authorization and documentation mismatch and assign recovery ownership before tomorrow's checkpoint.",
       visual: {
         trendId: "financial-trend",
         metric: "Denial rate 9.1%",
-        revenueAtRisk: "$150",
+        revenueAtRisk: "$42,000",
         owner: "Chief Financial Officer",
       },
     },
