@@ -29,7 +29,9 @@ function DailyBriefVideoPlaceholder() {
       .then((sceneAudio) => {
         generatedAudio = sceneAudio;
         setAudioBySceneId(sceneAudio);
-        setNarrative(getNarrativeWithAudioDurations(dailyBriefNarrative, sceneAudio));
+        setNarrative(
+          getNarrativeWithAudioDurations(dailyBriefNarrative, sceneAudio),
+        );
         setAudioState("ready");
       })
       .catch((error) => {
@@ -72,8 +74,8 @@ function DailyBriefVideoPlaceholder() {
         </div>
         <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold text-slate-600">
           {audioState === "loading" && "Generating voiceover"}
-          {audioState === "ready" && "TTS audio ready"}
-          {audioState === "error" && "TTS unavailable"}
+          {audioState === "ready" && "Audio ready"}
+          {audioState === "error" && "Audio unavailable"}
         </div>
       </div>
 
@@ -108,7 +110,10 @@ function getNarrativeWithAudioDurations(baseNarrative, sceneAudio) {
   return baseNarrative.map((scene) => {
     const audio = sceneAudio[scene.id];
 
-    if (!audio?.durationInSeconds || !Number.isFinite(audio.durationInSeconds)) {
+    if (
+      !audio?.durationInSeconds ||
+      !Number.isFinite(audio.durationInSeconds)
+    ) {
       return scene;
     }
 
@@ -122,7 +127,10 @@ function getNarrativeWithAudioDurations(baseNarrative, sceneAudio) {
 
     return {
       ...scene,
-      durationInFrames: Math.max(scene.durationInFrames, fittedDurationInFrames),
+      durationInFrames: Math.max(
+        scene.durationInFrames,
+        fittedDurationInFrames,
+      ),
     };
   });
 }
