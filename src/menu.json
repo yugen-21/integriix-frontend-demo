@@ -5,6 +5,11 @@
     "icon": "FaRegNewspaper"
   },
   {
+    "name": "Policy Management",
+    "url": "/policy-management",
+    "icon": "FaFileContract"
+  },
+  {
     "name": "Financials",
     "url": "/financials",
     "icon": "FaSackDollar"

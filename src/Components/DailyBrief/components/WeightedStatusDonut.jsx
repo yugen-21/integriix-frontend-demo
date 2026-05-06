@@ -88,38 +88,38 @@ function WeightedStatusDonut({ status }) {
           ))}
         </svg>
         <div className="absolute text-center">
-          <p className="text-xs font-bold uppercase text-slate-500">Score</p>
-          <p className="text-5xl font-black leading-none text-slate-950 max-[520px]:text-4xl">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Score</p>
+          <p className="text-3xl font-semibold leading-none text-slate-900 max-[520px]:text-2xl">
             {status.score}
           </p>
-          <p className="mt-1 text-sm font-black text-amber-700">
+          <p className="mt-1 text-xs font-semibold text-amber-700">
             {status.ragStatus}
           </p>
         </div>
       </div>
 
-      <div className="grid content-center gap-3 md:grid-cols-2">
+      <div className="grid content-center gap-2.5 md:grid-cols-2">
         {segments.map((segment) => (
           <div
             key={segment.id}
-            className="rounded-2xl border border-slate-100 bg-white/90 p-3 shadow-sm"
+            className="rounded-xl border border-slate-100 bg-white/90 p-2.5 shadow-sm"
           >
             <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
                 <span
-                  className="mt-1 h-3 w-3 shrink-0 rounded-full"
+                  className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{ backgroundColor: segment.color }}
                 />
                 <div className="min-w-0">
-                  <p className="text-sm font-black leading-tight text-slate-950">
+                  <p className="text-xs font-medium leading-tight text-slate-900">
                     {segment.label}
                   </p>
-                  <p className="mt-1 text-xs font-semibold text-slate-500">
+                  <p className="mt-0.5 text-[11px] text-slate-500">
                     Weight {segment.weight}% · {segment.trend}
                   </p>
                 </div>
               </div>
-              <p className="shrink-0 text-sm font-black text-slate-950">
+              <p className="shrink-0 text-sm font-semibold text-slate-900">
                 {segment.score}
               </p>
             </div>

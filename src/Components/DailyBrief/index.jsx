@@ -1,5 +1,6 @@
 import { mockDailyBriefData } from "../../data";
 import CriticalAlertsToday from "./components/CriticalAlertsToday";
+import DailyBriefHeader from "./components/DailyBriefHeader";
 import DailyBriefVideoPlaceholder from "./components/DailyBriefVideoPlaceholder";
 import FinancialTrendSpotlight from "./components/FinancialTrendSpotlight";
 import OverallStatusBand from "./components/OverallStatusBand";
@@ -8,11 +9,26 @@ import RisksAndWinsBoard from "./components/RisksAndWinsBoard";
 import TrendCards from "./components/TrendCards";
 import UpcomingDeadlines from "./components/UpcomingDeadlines";
 
+function getDateKey(dateValue) {
+  return new Date(dateValue).toISOString().slice(0, 10);
+}
+
 function DailyBrief() {
   const organizationStatus = mockDailyBriefData.organizationStatus;
+  const dayKey = getDateKey(mockDailyBriefData.meta.generatedAt);
+  const todaysDeadlinesCount = mockDailyBriefData.upcomingDeadlines.filter(
+    (deadline) => getDateKey(deadline.date) === dayKey,
+  ).length;
 
   return (
     <div className="grid min-w-0 gap-6 max-[900px]:gap-4">
+      <DailyBriefHeader
+        meta={mockDailyBriefData.meta}
+        status={organizationStatus}
+        alertCount={mockDailyBriefData.criticalAlertsToday.length}
+        deadlineCount={todaysDeadlinesCount}
+      />
+
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.55fr)]">
         <DailyBriefVideoPlaceholder />
         <OverallStatusHeroCard status={organizationStatus} />

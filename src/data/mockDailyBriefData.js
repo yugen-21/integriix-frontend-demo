@@ -30,58 +30,58 @@ function calculateWeightedScore(dimensions) {
 
 const enterpriseDimensions = [
   {
-    id: "patient-safety",
-    label: "Patient Safety",
+    id: "quality-safety-accreditation",
+    label: "Quality, Safety & Accreditation",
     weight: 25,
-    score: 62,
+    score: 64,
     trend: "Worsening",
     reason:
-      "Medication incident volume rose and ICU infection surveillance crossed internal threshold.",
+      "Medication incident escalation, CLABSI surveillance breach, and twelve overdue accreditation evidence items are pulling the module down.",
   },
   {
-    id: "compliance-accreditation",
-    label: "Compliance / Accreditation",
+    id: "risk-audit-governance",
+    label: "Risk, Audit & Governance",
     weight: 20,
+    score: 66,
+    trend: "Worsening",
+    reason:
+      "Two board-level risks have overdue mitigation actions and seventeen audit findings remain open past internal SLA.",
+  },
+  {
+    id: "clinical-intelligence",
+    label: "Clinical Intelligence",
+    weight: 15,
     score: 71,
     trend: "Stable",
     reason:
-      "Core standards remain on track, but overdue evidence and CAPAs are constraining readiness.",
+      "Sepsis bundle compliance is steady, but ICU protocol adherence and antimicrobial DOT are trending below target.",
   },
   {
-    id: "financial-controls",
-    label: "Financial Controls",
-    weight: 15,
-    score: 76,
-    trend: "Worsening",
-    reason:
-      "Cardiology denial rate increased due to authorization and documentation mismatches.",
-  },
-  {
-    id: "workforce-stability",
-    label: "Workforce Stability",
-    weight: 15,
-    score: 68,
-    trend: "Stable",
-    reason:
-      "Critical unit staffing is covered today, but ICU float-pool dependency remains elevated.",
-  },
-  {
-    id: "operational-continuity",
-    label: "Operational Continuity",
+    id: "financial-intelligence",
+    label: "Financial Intelligence",
     weight: 15,
     score: 70,
     trend: "Worsening",
     reason:
-      "Discharge delays are increasing bed pressure and downstream emergency department boarding.",
+      "Cardiology denial rate rose to 9.1% and one high-value denial is holding $42K of revenue at risk.",
   },
   {
-    id: "major-unresolved-risks",
-    label: "Major Unresolved Risks",
-    weight: 10,
-    score: 58,
+    id: "operational-intelligence",
+    label: "Operational Intelligence",
+    weight: 15,
+    score: 68,
     trend: "Worsening",
     reason:
-      "Board-level medication safety and accreditation evidence actions remain open past internal SLA.",
+      "Bed crunch early warnings fired on two wards and discharge-before-noon rate is 14 points below target.",
+  },
+  {
+    id: "patient-experience-access",
+    label: "Patient Experience & Access",
+    weight: 10,
+    score: 78,
+    trend: "Improving",
+    reason:
+      "NPS held steady and outpatient pharmacy complaints fell 22% after the queue redesign.",
   },
 ];
 
@@ -90,7 +90,7 @@ const organizationScore = calculateWeightedScore(enterpriseDimensions);
 export const mockDailyBriefData = {
   meta: {
     organizationName: "Riverside Metropolitan Hospital",
-    generatedAt: "2026-04-27T07:15:00+05:30",
+    generatedAt: "2026-05-06T20:37:44+05:30",
     audience: "C-suite leadership",
     briefOwner: "Chief Quality Officer",
     period: "Daily executive brief",
@@ -118,7 +118,7 @@ export const mockDailyBriefData = {
     score: organizationScore,
     ragStatus: getRagStatus(organizationScore),
     executiveSummary:
-      "The organization is in amber status today. Safety, accreditation evidence, operational flow, and revenue leakage from claims denials need leadership attention, while training completion and CAPA closure are improving the overall position.",
+      "The organization is in amber status today. Quality, Safety & Accreditation, Risk, Audit & Governance, Operational Intelligence, and Financial Intelligence all need leadership attention, while Patient Experience & Access continues to improve on the back of the outpatient pharmacy queue redesign.",
     dimensions: enterpriseDimensions.map((dimension) => ({
       ...dimension,
       ragStatus: getRagStatus(dimension.score),
@@ -126,28 +126,28 @@ export const mockDailyBriefData = {
     driversPullingDown: [
       {
         title: "Medication safety escalation",
-        dimension: "Patient Safety",
+        dimension: "Quality, Safety & Accreditation",
         impact: "-7 pts",
         reason:
           "High-severity medication incident has not entered RCA workflow within SLA.",
       },
       {
         title: "Accreditation evidence delay",
-        dimension: "Compliance / Accreditation",
+        dimension: "Quality, Safety & Accreditation",
         impact: "-5 pts",
         reason:
           "Twelve evidence items are overdue across medication reconciliation and infection control.",
       },
       {
         title: "Discharge throughput pressure",
-        dimension: "Operational Continuity",
+        dimension: "Operational Intelligence",
         impact: "-4 pts",
         reason:
           "Order-to-bed-release time is 3.8 hours above target, increasing ER boarding risk.",
       },
       {
         title: "High-value denials yesterday",
-        dimension: "Financial Controls",
+        dimension: "Financial Intelligence",
         impact: "-3 pts",
         reason:
           "Denial rate rose to 9.1%, with one high-value denial carrying $42,000 revenue at risk pending review.",
@@ -155,15 +155,15 @@ export const mockDailyBriefData = {
     ],
     driversPushingUp: [
       {
-        title: "Training completion improved",
-        dimension: "Workforce Stability",
-        impact: "+3 pts",
+        title: "Outpatient pharmacy complaints fell",
+        dimension: "Patient Experience & Access",
+        impact: "+4 pts",
         reason:
-          "Mandatory medication safety refresher completion improved by 14 percentage points.",
+          "Queue redesign cut wait-time complaints 22% week over week.",
       },
       {
         title: "CAPA closure velocity increased",
-        dimension: "Compliance / Accreditation",
+        dimension: "Quality, Safety & Accreditation",
         impact: "+2 pts",
         reason:
           "Quality team closed 18 lower-risk CAPAs over the last seven days.",
@@ -202,7 +202,7 @@ export const mockDailyBriefData = {
       location: "ICU",
       severity: "Critical",
       owner: "Chief Medical Officer",
-      sourceModule: "Incident Reporting",
+      sourceModule: "Quality, Safety & Accreditation · Incident Management",
       summary:
         "RCA not initiated within SLA after anticoagulant administration variance.",
       requiredAction:
@@ -217,7 +217,7 @@ export const mockDailyBriefData = {
       location: "ICU",
       severity: "Critical",
       owner: "Infection Control Lead",
-      sourceModule: "Infection Control",
+      sourceModule: "Quality, Safety & Accreditation · Infection Control Surveillance",
       summary:
         "Two central-line cases are linked to maintenance bundle variance.",
       requiredAction:
@@ -232,7 +232,7 @@ export const mockDailyBriefData = {
       location: "Quality & Compliance",
       severity: "High",
       owner: "Chief Quality Officer",
-      sourceModule: "Audit Tools",
+      sourceModule: "Quality, Safety & Accreditation · Accreditation Readiness",
       summary:
         "Medication reconciliation and infection control evidence remains incomplete.",
       requiredAction:
@@ -247,7 +247,7 @@ export const mockDailyBriefData = {
       location: "Revenue Cycle",
       severity: "High",
       owner: "Chief Financial Officer",
-      sourceModule: "Revenue Cycle",
+      sourceModule: "Financial Intelligence · Revenue Cycle Management",
       summary:
         "Denials increased to 9.1% after authorization and documentation mismatch spike, including one high-value denial with $42,000 revenue at risk.",
       requiredAction:
@@ -262,7 +262,7 @@ export const mockDailyBriefData = {
       location: "Bed Management",
       severity: "High",
       owner: "Chief Operating Officer",
-      sourceModule: "Bed Management",
+      sourceModule: "Operational Intelligence · Bed & Capacity Management",
       summary:
         "Board-level patient flow action remains open while bed-release delays worsen.",
       requiredAction:
@@ -276,7 +276,7 @@ export const mockDailyBriefData = {
     {
       id: "risk-001",
       name: "Medication safety variance in high-acuity units",
-      category: "Patient Safety",
+      category: "Quality, Safety & Accreditation",
       inherentRiskScore: 94,
       scoring: {
         severity: 5,
@@ -290,12 +290,12 @@ export const mockDailyBriefData = {
       mitigationStatus: "Delayed",
       owner: "Chief Medical Officer",
       nextMilestone: "RCA opened and clinical lead assigned by 11:30",
-      linkedItems: ["ICU", "Incident Reporting", "Medication Management"],
+      linkedItems: ["ICU", "Incident Management", "CAPA Management"],
     },
     {
       id: "risk-002",
       name: "Accreditation evidence gap before survey review",
-      category: "Compliance / Accreditation",
+      category: "Quality, Safety & Accreditation",
       inherentRiskScore: 88,
       scoring: {
         severity: 4,
@@ -309,12 +309,12 @@ export const mockDailyBriefData = {
       mitigationStatus: "In Progress",
       owner: "Chief Quality Officer",
       nextMilestone: "All overdue evidence uploaded by 16:00",
-      linkedItems: ["Audit Tools", "Infection Control", "Medication Reconciliation"],
+      linkedItems: ["Accreditation Readiness", "Infection Control", "Policy & Document Management"],
     },
     {
       id: "risk-003",
       name: "Discharge throughput pressure affecting access",
-      category: "Operational Continuity",
+      category: "Operational Intelligence",
       inherentRiskScore: 84,
       scoring: {
         severity: 4,
@@ -328,12 +328,12 @@ export const mockDailyBriefData = {
       mitigationStatus: "Open",
       owner: "Chief Operating Officer",
       nextMilestone: "Discharge command review completed by 14:00",
-      linkedItems: ["Bed Management", "Emergency", "Patient Feedback"],
+      linkedItems: ["Bed & Capacity", "Workforce Management", "Patient Flow"],
     },
     {
       id: "risk-004",
       name: "Claims denial leakage from documentation gaps",
-      category: "Financial Controls",
+      category: "Financial Intelligence",
       inherentRiskScore: 76,
       scoring: {
         severity: 3,
@@ -347,12 +347,12 @@ export const mockDailyBriefData = {
       mitigationStatus: "Open",
       owner: "Chief Financial Officer",
       nextMilestone: "Denied claim sample reviewed by tomorrow 11:00",
-      linkedItems: ["Revenue Cycle", "Cardiology", "Clinical Notes"],
+      linkedItems: ["Revenue Cycle", "Cost Analytics", "Cardiology"],
     },
     {
       id: "risk-005",
-      name: "Critical unit staffing resilience",
-      category: "Workforce Stability",
+      name: "Open audit findings ageing past 90 days",
+      category: "Risk, Audit & Governance",
       inherentRiskScore: 72,
       scoring: {
         severity: 4,
@@ -364,9 +364,9 @@ export const mockDailyBriefData = {
       },
       trend: "Stable",
       mitigationStatus: "Monitored",
-      owner: "Chief Nursing Officer",
-      nextMilestone: "ICU float-pool coverage confirmed for evening shift",
-      linkedItems: ["ICU", "Workforce Scheduling", "Nursing Office"],
+      owner: "Chief Risk Officer",
+      nextMilestone: "Aged-finding triage closed for 6 of 17 by Friday",
+      linkedItems: ["Internal Audit", "Risk Register", "Compliance Monitoring"],
     },
   ],
 
@@ -378,6 +378,7 @@ export const mockDailyBriefData = {
         "Improved completion reduces recurrence risk in high-acuity medication workflows.",
       measurableImprovement: "+14 pts week over week",
       department: "Nursing / Pharmacy",
+      module: "Quality, Safety & Accreditation",
       canReplicateElsewhere: true,
       replicationNote: "Extend the same completion tracking to Emergency and Cardiology.",
     },
@@ -388,38 +389,42 @@ export const mockDailyBriefData = {
         "Faster closure improves accreditation readiness and reduces open governance burden.",
       measurableImprovement: "18 CAPAs closed in seven days",
       department: "Quality & Compliance",
+      module: "Quality, Safety & Accreditation",
       canReplicateElsewhere: true,
       replicationNote: "Use the same owner-due-time model for audit evidence closure.",
     },
     {
       id: "win-003",
-      title: "Patient complaints reduced in outpatient pharmacy",
+      title: "Outpatient pharmacy complaints down",
       whyItMatters:
         "Lower wait-time complaints indicate the queue redesign is working.",
       measurableImprovement: "-22% complaints vs prior week",
       department: "Outpatient Pharmacy",
+      module: "Patient Experience & Access",
       canReplicateElsewhere: true,
       replicationNote: "Replicate queue visibility in Radiology registration.",
     },
     {
       id: "win-004",
-      title: "Predictive warning caught a discharge delay cluster",
+      title: "Sepsis bundle compliance improved",
       whyItMatters:
-        "Early warning allowed operations to intervene before afternoon bed pressure peaked.",
-      measurableImprovement: "2 wards flagged before SLA breach",
-      department: "Bed Management",
-      canReplicateElsewhere: false,
-      replicationNote: "Continue monitoring before expanding the model scope.",
+        "Higher protocol adherence correlates with lower 30-day mortality and shorter LOS.",
+      measurableImprovement: "+9 pts bundle compliance",
+      department: "Emergency / ICU",
+      module: "Clinical Intelligence",
+      canReplicateElsewhere: true,
+      replicationNote: "Roll the same alert threshold into VTE and falls bundles.",
     },
     {
       id: "win-005",
-      title: "Financial control exception rate dropped",
+      title: "Fraud anomaly detection caught duplicate billing",
       whyItMatters:
-        "Fewer control exceptions reduce rework and revenue leakage exposure.",
-      measurableImprovement: "-11% exceptions month to date",
+        "Stops repeat leakage and reduces forensic audit triggers downstream.",
+      measurableImprovement: "$28K recovered, 6 duplicates flagged",
       department: "Revenue Cycle",
+      module: "Financial Intelligence",
       canReplicateElsewhere: true,
-      replicationNote: "Apply the checklist to high-volume surgical specialties.",
+      replicationNote: "Apply the same anomaly model to outlier claims by payer.",
     },
   ],
 
@@ -545,7 +550,7 @@ export const mockDailyBriefData = {
       id: "deadline-001",
       title: "Medication reconciliation evidence submission",
       type: "Accreditation evidence",
-      date: "2026-04-27T16:00:00+05:30",
+      date: "2026-05-06T16:00:00+05:30",
       owner: "Chief Quality Officer",
       readinessStatus: "At Risk",
       blockers: ["Missing audit trail", "Two ward owner attestations pending"],
@@ -557,7 +562,7 @@ export const mockDailyBriefData = {
       id: "deadline-002",
       title: "ICU infection control review",
       type: "Leadership review milestone",
-      date: "2026-04-27T12:00:00+05:30",
+      date: "2026-05-06T12:00:00+05:30",
       owner: "Infection Control Lead",
       readinessStatus: "Blocked",
       blockers: ["Line bundle audit not complete"],
@@ -569,7 +574,7 @@ export const mockDailyBriefData = {
       id: "deadline-003",
       title: "Board risk action update",
       type: "Committee papers",
-      date: "2026-04-28T09:00:00+05:30",
+      date: "2026-05-07T09:00:00+05:30",
       owner: "Chief Risk Officer",
       readinessStatus: "Watch",
       blockers: ["Medication RCA owner not confirmed"],
@@ -581,7 +586,7 @@ export const mockDailyBriefData = {
       id: "deadline-004",
       title: "Cardiology denial control review",
       type: "Financial control review",
-      date: "2026-04-28T11:00:00+05:30",
+      date: "2026-05-07T11:00:00+05:30",
       owner: "Chief Financial Officer",
       readinessStatus: "On Track",
       blockers: ["Denied claim sample extraction pending"],
@@ -593,7 +598,7 @@ export const mockDailyBriefData = {
       id: "deadline-005",
       title: "Mandatory safety refresher completion",
       type: "Training deadline",
-      date: "2026-04-30T17:00:00+05:30",
+      date: "2026-05-09T17:00:00+05:30",
       owner: "Chief Nursing Officer",
       readinessStatus: "On Track",
       blockers: ["Evening shift completion remains below target"],
