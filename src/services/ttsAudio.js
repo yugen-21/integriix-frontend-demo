@@ -6,16 +6,8 @@ const TTS_API_URL =
 export async function fetchSceneVoiceovers(narrative, signal) {
   const audioEntries = await Promise.all(
     narrative.map(async (scene) => {
-      const response = await fetch(TTS_API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: scene.voiceover,
-        }),
-        signal,
-      });
+      const requestUrl = `${TTS_API_URL}?text=${encodeURIComponent(scene.voiceover)}`;
+      const response = await fetch(requestUrl, { signal });
 
       if (!response.ok) {
         const detail = await response.text();
