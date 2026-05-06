@@ -6,3 +6,9 @@ export { mockExecutiveKpis } from "./mockExecutiveKpis";
 export { mockInsightStories } from "./mockInsightStories";
 export { mockPriorityActions } from "./mockPriorityActions";
 export { mockDailyBriefData } from "./mockDailyBriefData";
+export {
+  mockPolicies,
+  policyCategories,
+  policyStatuses,
+  getPolicyDetail,
+} from "./mockPolicies";
