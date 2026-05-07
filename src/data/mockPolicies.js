@@ -249,6 +249,92 @@ export function buildPolicyDetail(policy) {
 
 const accreditationBodies = ["JCI", "CBAHI", "DoH", "JAWDA"];
 
+// Maps each accreditation element code to the closest XYZ Hospital starter
+// template that addresses it. Used to surface a "Download template" / "AI-fill"
+// recommendation under every failed gap row in the audit checklist.
+const templateRecommendationByCode = {
+  "MMU.4": {
+    code: "MMU-014",
+    title: "Prescription Medication Order Writing Policy",
+    filename: "MMU-014_Prescription_Medication_Order_Writing_Policy.docx",
+  },
+  "MMU.5": {
+    code: "MMU-018",
+    title: "Dispensing of Medications Policy",
+    filename: "MMU-018_Dispensing_of_Medications_Policy.docx",
+  },
+  "MMU.6": {
+    code: "MMU-022",
+    title: "Medication Administration Five/Eight Rights Policy",
+    filename: "MMU-022_Medication_Administration_Five_Eight_Rights_Policy.docx",
+  },
+  "IPSG.3": {
+    code: "MMU-009",
+    title: "High-Alert High-Risk Medication Policy",
+    filename: "MMU-009_High-Alert_High-Risk_Medication_Policy.docx",
+  },
+  "GLD.6": {
+    code: "GLO-005",
+    title: "Organizational Structure and Reporting Hierarchy Policy",
+    filename: "GLO-005_Organizational_Structure_and_Reporting_Hierarchy_Policy.docx",
+  },
+  "QPS.5": {
+    code: "QPS-002",
+    title: "Continuous Quality Improvement (CQI/PDCA) Policy",
+    filename: "QPS-002_Continuous_Quality_Improvement_CQI_PDCA_Policy.docx",
+  },
+  "SQE.8": {
+    code: "ETR-001",
+    title: "Hospital Education and Training Policy",
+    filename: "ETR-001_Hospital_Education_and_Training_Policy.docx",
+  },
+  "PCC.2": {
+    code: "PRE-001",
+    title: "Patient Rights and Responsibilities Charter Policy",
+    filename: "PRE-001_Patient_Rights_and_Responsibilities_Charter_Policy.docx",
+  },
+  "LD.10": {
+    code: "GLO-005",
+    title: "Organizational Structure and Reporting Hierarchy Policy",
+    filename: "GLO-005_Organizational_Structure_and_Reporting_Hierarchy_Policy.docx",
+  },
+  "MM.05": {
+    code: "MMU-009",
+    title: "High-Alert High-Risk Medication Policy",
+    filename: "MMU-009_High-Alert_High-Risk_Medication_Policy.docx",
+  },
+  "PR.04": {
+    code: "PRE-003",
+    title: "Informed Consent Policy (General)",
+    filename: "PRE-003_Informed_Consent_Policy_General.docx",
+  },
+  "DoH-PS-04": {
+    code: "MMU-025",
+    title: "Medication Error Identification and Reporting Policy",
+    filename: "MMU-025_Medication_Error_Identification_and_Reporting_Policy.docx",
+  },
+  "DoH-PRG-12": {
+    code: "GLO-005",
+    title: "Organizational Structure and Reporting Hierarchy Policy",
+    filename: "GLO-005_Organizational_Structure_and_Reporting_Hierarchy_Policy.docx",
+  },
+  "DoH-WF-07": {
+    code: "CRP-001",
+    title: "Medical Staff Credentialing and Privileging Policy",
+    filename: "CRP-001_Medical_Staff_Credentialing_and_Privileging_Policy.docx",
+  },
+  "JAWDA-Q1": {
+    code: "QPS-003",
+    title: "Quality Indicator and KPI Monitoring Policy",
+    filename: "QPS-003_Quality_Indicator_and_KPI_Monitoring_Policy.docx",
+  },
+  "JAWDA-PE-2": {
+    code: "QPS-008",
+    title: "Patient Satisfaction Survey Policy",
+    filename: "QPS-008_Patient_Satisfaction_Survey_Policy.docx",
+  },
+};
+
 const gapElementLibrary = {
   JCI: [
     {
@@ -388,6 +474,7 @@ function buildAiInsights(policy, fixed) {
           ? "Critical"
           : "Moderate",
       remediation: `Add a clause covering ${element.label.toLowerCase()} with explicit owner and timing.`,
+      recommendedTemplate: templateRecommendationByCode[element.code] ?? null,
     }));
     map[body] = { covered, gaps };
     return map;

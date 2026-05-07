@@ -10,18 +10,22 @@ import {
   FaCircleXmark,
   FaClockRotateLeft,
   FaCloudArrowUp,
+  FaDownload,
   FaFile,
   FaFileLines,
   FaHand,
   FaListCheck,
+  FaPrint,
   FaQuoteLeft,
   FaRegLightbulb,
+  FaRegSquare,
   FaRobot,
+  FaSquareCheck,
   FaTags,
-  FaTriangleExclamation,
   FaUserTie,
   FaWandMagicSparkles,
 } from "react-icons/fa6";
+import jsPDF from "jspdf";
 import { buildPolicyDetail } from "../../../data";
 import VersionUploader from "./VersionUploader";
 
@@ -46,7 +50,7 @@ const transitionMap = {
 const TABS = [
   { id: "overview", label: "Overview", Icon: FaFileLines },
   { id: "versions", label: "Versions", Icon: FaClockRotateLeft },
-  { id: "jci", label: "JCI Tags", Icon: FaTags },
+  { id: "checklist", label: "Checklist", Icon: FaSquareCheck },
   { id: "ai", label: "AI", Icon: FaWandMagicSparkles },
   { id: "activity", label: "Activity", Icon: FaListCheck },
 ];
@@ -186,7 +190,7 @@ function PolicyDetail({ policy: policyInput, onBack, onEdit, onUploadVersion }) 
               <VersionsTab policy={policy} onUploadClick={openUploader} />
             )}
             {activeTab === "acks" && <AcknowledgementsTab policy={policy} />}
-            {activeTab === "jci" && <JciTagsTab policy={policy} />}
+            {activeTab === "checklist" && <ChecklistTab policy={policy} />}
             {activeTab === "ai" && (
               <AiTab policy={policy} onJumpToCitation={jumpToCitation} />
             )}
@@ -305,7 +309,13 @@ function DetailHeader({
   );
 }
 
-function SidePanel({ policy, status, nextStatus, onTransition, onUploadVersionClick }) {
+function SidePanel({
+  policy,
+  status,
+  nextStatus,
+  onTransition,
+  onUploadVersionClick,
+}) {
   const overdue = isOverdue(policy.nextReview);
 
   const items = [
@@ -760,92 +770,6 @@ function AcknowledgementsTab({ policy }) {
   );
 }
 
-function JciTagsTab({ policy }) {
-  const acceptedCount = policy.detail.jciTags.filter((t) => t.accepted).length;
-  const suggestedCount = policy.detail.jciTags.length - acceptedCount;
-
-  return (
-    <div className="grid gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200">
-          {acceptedCount} accepted
-        </span>
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-cyan-50 px-2.5 py-0.5 text-[11px] font-semibold text-cyan-700 ring-1 ring-cyan-200">
-          {suggestedCount} AI-suggested
-        </span>
-        <p className="ml-auto text-[11px] text-slate-500">
-          Confidence pills indicate model certainty.
-        </p>
-      </div>
-
-      <ul className="grid gap-2">
-        {policy.detail.jciTags.map((tag) => {
-          const confidencePct = Math.round(tag.confidence * 100);
-          const confidenceTone =
-            confidencePct >= 85
-              ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-              : confidencePct >= 70
-                ? "bg-cyan-50 text-cyan-700 ring-cyan-200"
-                : "bg-amber-50 text-amber-700 ring-amber-200";
-
-          return (
-            <li
-              key={tag.code}
-              className={`grid gap-3 rounded-2xl border p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center ${
-                tag.accepted
-                  ? "border-emerald-200 bg-emerald-50/30"
-                  : "border-slate-100 bg-white"
-              }`}
-            >
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-md bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-white">
-                    {tag.code}
-                  </span>
-                  <span className="text-sm font-medium text-slate-900">
-                    {tag.label}
-                  </span>
-                  <span
-                    className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${confidenceTone}`}
-                  >
-                    {confidencePct}% confidence
-                  </span>
-                </div>
-                <p className="mt-1.5 text-[11px] leading-5 text-slate-600">
-                  {tag.rationale}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {tag.accepted ? (
-                  <span className="inline-flex h-8 items-center gap-1.5 rounded-md bg-emerald-600 px-3 text-xs font-semibold text-white">
-                    <FaCircleCheck className="h-3 w-3" aria-hidden="true" />
-                    Accepted
-                  </span>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className="inline-flex h-8 items-center rounded-md bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-800"
-                    >
-                      Accept
-                    </button>
-                    <button
-                      type="button"
-                      className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                    >
-                      Dismiss
-                    </button>
-                  </>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
 const ACCREDITATION_BODIES = ["JCI", "CBAHI", "DoH", "JAWDA"];
 
 function AiTab({ policy, onJumpToCitation }) {
@@ -926,10 +850,6 @@ function AiTab({ policy, onJumpToCitation }) {
         summary={insights.summary}
         onJumpToCitation={onJumpToCitation}
       />
-      <GapNarrativePanel
-        policy={policy}
-        gapAnalysis={insights.gapAnalysis}
-      />
       <JciTagPickerPanel
         suggestions={tagState.suggestions}
         confirmed={tagState.confirmed}
@@ -938,6 +858,11 @@ function AiTab({ policy, onJumpToCitation }) {
         onRestore={handleRestore}
         onAddManual={handleAddManual}
       />
+      <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-[11px] leading-5 text-slate-600">
+        Looking for the gap-by-body crosswalk? It moved to the{" "}
+        <span className="font-semibold text-slate-800">Checklist</span> tab,
+        where you can also print or download a PDF.
+      </p>
     </div>
   );
 }
@@ -1057,205 +982,6 @@ function AiSummaryPanel({ summary, onJumpToCitation }) {
             </button>
           </div>
         )}
-      </div>
-    </section>
-  );
-}
-
-function GapNarrativePanel({ policy, gapAnalysis }) {
-  const initialBody = policy.accreditationTags?.[0] ?? "JCI";
-  const [body, setBody] = useState(
-    ACCREDITATION_BODIES.includes(initialBody) ? initialBody : "JCI",
-  );
-  const [activeElement, setActiveElement] = useState(null);
-
-  const data = gapAnalysis[body] ?? { covered: [], gaps: [] };
-  const coveredCodes = data.covered.map((el) => el.code).join(", ");
-  const gapCodes = data.gaps.map((el) => el.code).join(", ");
-
-  function selectElement(element, kind) {
-    setActiveElement({ ...element, kind });
-  }
-
-  return (
-    <section className="rounded-2xl border border-slate-100 bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-2.5">
-        <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
-          <FaTriangleExclamation className="h-3 w-3" aria-hidden="true" />
-          Gap narrative
-        </p>
-        <label className="inline-flex items-center gap-2 text-[11px] text-slate-500">
-          <span>Body</span>
-          <select
-            value={body}
-            onChange={(e) => {
-              setBody(e.target.value);
-              setActiveElement(null);
-            }}
-            className="h-7 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-700 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
-          >
-            {ACCREDITATION_BODIES.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="grid gap-3">
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-3">
-            <p className="text-xs leading-5 text-slate-700">
-              This policy <span className="font-semibold">covers</span>{" "}
-              <span className="font-semibold text-emerald-700">{body}</span>{" "}
-              elements{" "}
-              <span className="font-semibold text-emerald-700">
-                {coveredCodes || "none detected"}
-              </span>
-              .
-            </p>
-            <ul className="mt-2 grid gap-1.5">
-              {data.covered.map((element) => {
-                const isActive = activeElement?.code === element.code;
-                return (
-                  <li key={element.code}>
-                    <button
-                      type="button"
-                      onClick={() => selectElement(element, "covered")}
-                      className={`grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2 py-1.5 text-left transition ${
-                        isActive
-                          ? "bg-emerald-100"
-                          : "hover:bg-emerald-50/80"
-                      }`}
-                    >
-                      <span className="rounded-md bg-emerald-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                        {element.code}
-                      </span>
-                      <span className="truncate text-xs text-slate-700">
-                        {element.label}
-                      </span>
-                      <span className="text-[10px] font-medium text-emerald-700">
-                        {element.citation.label}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-
-          <div className="rounded-xl border border-red-200 bg-red-50/40 p-3">
-            <p className="text-xs leading-5 text-slate-700">
-              <span className="font-semibold text-red-700">Gaps:</span>{" "}
-              {gapCodes ? (
-                <>
-                  <span className="font-semibold text-red-700">{gapCodes}</span>{" "}
-                  not addressed.
-                </>
-              ) : (
-                "no gaps detected at current confidence threshold."
-              )}
-            </p>
-            <ul className="mt-2 grid gap-1.5">
-              {data.gaps.map((element) => {
-                const isActive = activeElement?.code === element.code;
-                return (
-                  <li key={element.code}>
-                    <button
-                      type="button"
-                      onClick={() => selectElement(element, "gap")}
-                      className={`grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2 py-1.5 text-left transition ${
-                        isActive ? "bg-red-100" : "hover:bg-red-50/80"
-                      }`}
-                    >
-                      <span className="rounded-md bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                        {element.code}
-                      </span>
-                      <span className="truncate text-xs text-slate-700">
-                        {element.label}
-                      </span>
-                      <span
-                        className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 ${
-                          element.severity === "Critical"
-                            ? "bg-red-50 text-red-700 ring-red-200"
-                            : "bg-amber-50 text-amber-700 ring-amber-200"
-                        }`}
-                      >
-                        {element.severity}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        </div>
-
-        <aside
-          className={`rounded-xl border p-3 ${
-            activeElement?.kind === "gap"
-              ? "border-red-200 bg-red-50/30"
-              : activeElement
-                ? "border-emerald-200 bg-emerald-50/30"
-                : "border-slate-200 bg-slate-50/40"
-          }`}
-        >
-          {activeElement ? (
-            <>
-              <p className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                {activeElement.kind === "gap" ? "Gap element" : "Covered element"}
-              </p>
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                <span
-                  className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-white ${
-                    activeElement.kind === "gap"
-                      ? "bg-red-600"
-                      : "bg-emerald-600"
-                  }`}
-                >
-                  {activeElement.code}
-                </span>
-                <span className="text-xs font-semibold text-slate-900">
-                  {activeElement.label}
-                </span>
-              </div>
-              <p className="mt-2 text-[11px] leading-5 text-slate-600">
-                {activeElement.text}
-              </p>
-
-              {activeElement.kind === "covered" ? (
-                <div className="mt-3 rounded-md bg-white/80 p-2 ring-1 ring-emerald-200">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                    Citation · {activeElement.citation.label}
-                  </p>
-                  <p className="mt-1 text-[11px] leading-5 text-slate-700">
-                    "{activeElement.citation.excerpt}"
-                  </p>
-                </div>
-              ) : (
-                <div className="mt-3 rounded-md bg-white/80 p-2 ring-1 ring-red-200">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-red-700">
-                    Suggested remediation
-                  </p>
-                  <p className="mt-1 text-[11px] leading-5 text-slate-700">
-                    {activeElement.remediation}
-                  </p>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="grid place-items-center gap-2 py-6 text-center">
-              <FaQuoteLeft
-                className="h-4 w-4 text-slate-300"
-                aria-hidden="true"
-              />
-              <p className="text-[11px] text-slate-500">
-                Select a {body} element to see its text and citation.
-              </p>
-            </div>
-          )}
-        </aside>
       </div>
     </section>
   );
@@ -1590,4 +1316,814 @@ function ActivityTab({ policy }) {
   );
 }
 
+function ChecklistTab({ policy }) {
+  const gapAnalysis = policy.detail.aiInsights.gapAnalysis;
+  const generatedAt = useMemo(() => new Date(), []);
+  const [bodyFilter, setBodyFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+
+  const allBodySummaries = ACCREDITATION_BODIES.map((body) => {
+    const data = gapAnalysis[body] ?? { covered: [], gaps: [] };
+    const total = data.covered.length + data.gaps.length;
+    const coveragePct =
+      total === 0 ? 0 : Math.round((data.covered.length / total) * 100);
+    return { body, data, total, coveragePct };
+  });
+
+  const totals = allBodySummaries.reduce(
+    (acc, b) => ({
+      total: acc.total + b.total,
+      covered: acc.covered + b.data.covered.length,
+      gaps: acc.gaps + b.data.gaps.length,
+      critical:
+        acc.critical +
+        b.data.gaps.filter((g) => g.severity === "Critical").length,
+    }),
+    { total: 0, covered: 0, gaps: 0, critical: 0 },
+  );
+  const overallPct =
+    totals.total === 0 ? 0 : Math.round((totals.covered / totals.total) * 100);
+
+  const filteredSummaries = allBodySummaries
+    .filter(({ body }) => bodyFilter === "ALL" || body === bodyFilter)
+    .map(({ body, data, total, coveragePct }) => {
+      if (statusFilter === "covered") {
+        return {
+          body,
+          data: { ...data, gaps: [] },
+          total,
+          coveragePct,
+        };
+      }
+      if (statusFilter === "gap") {
+        return {
+          body,
+          data: { ...data, covered: [] },
+          total,
+          coveragePct,
+        };
+      }
+      return { body, data, total, coveragePct };
+    });
+
+  function handlePrint() {
+    window.print();
+  }
+
+  function handleDownloadPdf() {
+    const doc = buildChecklistPdf(
+      policy,
+      allBodySummaries,
+      totals,
+      overallPct,
+      generatedAt,
+    );
+    doc.save(`${policy.code}-accreditation-checklist.pdf`);
+  }
+
+  return (
+    <div
+      id="accreditation-checklist-print-root"
+      className="grid gap-4"
+    >
+      <header className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-cyan-200 bg-gradient-to-br from-cyan-50/60 to-white px-4 py-3 print:border-slate-300 print:bg-white">
+        <div className="flex items-start gap-2.5">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-600 text-white print:hidden">
+            <FaSquareCheck className="h-3.5 w-3.5" aria-hidden="true" />
+          </span>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-cyan-700">
+              Policy accreditation checklist
+            </p>
+            <p className="mt-0.5 text-sm font-semibold text-slate-900">
+              {policy.title}
+            </p>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              {policy.code} · {policy.version} · {policy.category} ·{" "}
+              {policy.department}
+            </p>
+            <p className="text-[11px] text-slate-500">
+              Owner: {policy.owner} · Generated{" "}
+              {formatDateTime(generatedAt)}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 print:hidden">
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <FaPrint className="h-3 w-3" aria-hidden="true" />
+            Print
+          </button>
+          <button
+            type="button"
+            onClick={handleDownloadPdf}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-cyan-600 px-3 text-xs font-semibold text-white hover:bg-cyan-700"
+          >
+            <FaDownload className="h-3 w-3" aria-hidden="true" />
+            Download PDF
+          </button>
+        </div>
+      </header>
+
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <SummaryStat label="Total elements" value={totals.total} tone="slate" />
+        <SummaryStat
+          label="Covered"
+          value={`${totals.covered} (${overallPct}%)`}
+          tone="emerald"
+        />
+        <SummaryStat label="Gaps" value={totals.gaps} tone="red" />
+        <SummaryStat
+          label="Critical gaps"
+          value={totals.critical}
+          tone="amber"
+        />
+      </section>
+
+      <div className="flex flex-wrap items-center gap-2 print:hidden">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          Filter
+        </span>
+        <label className="inline-flex items-center gap-1.5 text-[11px] text-slate-500">
+          <span>Body</span>
+          <select
+            value={bodyFilter}
+            onChange={(e) => setBodyFilter(e.target.value)}
+            className="h-7 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-700 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
+          >
+            <option value="ALL">All bodies</option>
+            {ACCREDITATION_BODIES.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="inline-flex items-center gap-1.5 text-[11px] text-slate-500">
+          <span>Status</span>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-7 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-700 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
+          >
+            <option value="ALL">All</option>
+            <option value="covered">Covered only</option>
+            <option value="gap">Gaps only</option>
+          </select>
+        </label>
+        <span className="text-[10px] text-slate-400">
+          Filters affect on-screen view only — Print and Download PDF always
+          export the full checklist.
+        </span>
+      </div>
+
+      <div className="grid gap-4">
+        {filteredSummaries.map(({ body, data, total, coveragePct }) => (
+          <BodyChecklistSection
+            key={body}
+            body={body}
+            data={data}
+            total={total}
+            coveragePct={coveragePct}
+          />
+        ))}
+        {filteredSummaries.every(
+          ({ data }) => data.covered.length === 0 && data.gaps.length === 0,
+        ) && (
+          <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-center text-xs text-slate-500">
+            No items match the current filter.
+          </p>
+        )}
+      </div>
+
+      <footer className="border-t border-slate-200 pt-3 text-[10px] leading-5 text-slate-500">
+        Demo mode — values are illustrative. Coverage and gap detection are
+        simulated from the policy text. Verify against the published
+        accreditation manuals before formal submission.
+      </footer>
+
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #accreditation-checklist-print-root,
+          #accreditation-checklist-print-root * { visibility: visible !important; }
+          #accreditation-checklist-print-root {
+            position: absolute !important;
+            inset: 0 !important;
+            margin: 0 !important;
+            padding: 24px !important;
+            background: white !important;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function SummaryStat({ label, value, tone }) {
+  const tones = {
+    slate: "border-slate-200 bg-slate-50 text-slate-700",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    red: "border-red-200 bg-red-50 text-red-700",
+    amber: "border-amber-200 bg-amber-50 text-amber-700",
+  };
+  return (
+    <div
+      className={`rounded-lg border p-3 ${tones[tone] ?? tones.slate}`}
+    >
+      <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
+        {label}
+      </p>
+      <p className="mt-1 text-lg font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function BodyChecklistSection({ body, data, total, coveragePct }) {
+  return (
+    <section className="break-inside-avoid rounded-xl border border-slate-200 print:border-slate-300">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2 print:bg-white">
+        <div className="flex items-center gap-2">
+          <span className="rounded-md bg-slate-900 px-2 py-0.5 text-[11px] font-semibold text-white">
+            {body}
+          </span>
+          <span className="text-xs font-semibold text-slate-700">
+            Standards crosswalk
+          </span>
+        </div>
+        <span className="text-[11px] font-medium text-slate-600">
+          {data.covered.length}/{total} covered ({coveragePct}%)
+        </span>
+      </header>
+
+      {total === 0 ? (
+        <p className="px-4 py-4 text-xs text-slate-500">
+          No elements defined for this body.
+        </p>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {data.covered.map((el) => (
+            <ChecklistRow
+              key={`covered-${el.code}`}
+              checked
+              code={el.code}
+              label={el.label}
+              text={el.text}
+              meta={el.citation && `Citation: ${el.citation.label}`}
+              metaText={el.citation?.excerpt}
+              status="covered"
+            />
+          ))}
+          {data.gaps.map((el) => (
+            <ChecklistRow
+              key={`gap-${el.code}`}
+              checked={false}
+              code={el.code}
+              label={el.label}
+              text={el.text}
+              meta={`Gap · ${el.severity}`}
+              metaText={el.remediation}
+              status="gap"
+              severity={el.severity}
+              recommendedTemplate={el.recommendedTemplate}
+            />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function ChecklistRow({
+  checked,
+  code,
+  label,
+  text,
+  meta,
+  metaText,
+  status,
+  severity,
+  recommendedTemplate,
+}) {
+  return (
+    <li className="flex gap-3 px-4 py-3">
+      <span
+        className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded ${
+          checked ? "text-emerald-600" : "text-slate-300"
+        }`}
+        aria-hidden="true"
+      >
+        {checked ? (
+          <FaSquareCheck className="h-4 w-4" />
+        ) : (
+          <FaRegSquare className="h-4 w-4" />
+        )}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold text-white ${
+              status === "covered" ? "bg-emerald-600" : "bg-red-600"
+            }`}
+          >
+            {code}
+          </span>
+          <span className="text-xs font-semibold text-slate-900">{label}</span>
+          {status === "gap" && severity && (
+            <span
+              className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 ${
+                severity === "Critical"
+                  ? "bg-red-50 text-red-700 ring-red-200"
+                  : "bg-amber-50 text-amber-700 ring-amber-200"
+              }`}
+            >
+              {severity}
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-[11px] leading-5 text-slate-600">{text}</p>
+        {meta && (
+          <p
+            className={`mt-1.5 text-[10px] font-semibold uppercase tracking-wide ${
+              status === "covered" ? "text-emerald-700" : "text-red-700"
+            }`}
+          >
+            {meta}
+          </p>
+        )}
+        {metaText && (
+          <p className="mt-0.5 text-[11px] leading-5 text-slate-600">
+            {status === "covered" ? `"${metaText}"` : metaText}
+          </p>
+        )}
+        {status === "gap" && recommendedTemplate && (
+          <TemplateRecommendation
+            template={recommendedTemplate}
+            elementCode={code}
+            elementLabel={label}
+            elementText={text}
+          />
+        )}
+      </div>
+    </li>
+  );
+}
+
+function TemplateRecommendation({ template, elementCode, elementLabel, elementText }) {
+  const [feedback, setFeedback] = useState(null);
+
+  function downloadBlob(filename, body) {
+    const blob = new Blob([body], {
+      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  function handleDownload() {
+    downloadBlob(template.filename, buildTemplateSkeleton(template));
+    setFeedback(`Downloaded ${template.code} skeleton template.`);
+    setTimeout(() => setFeedback(null), 3500);
+  }
+
+  function handleAiFill() {
+    const filename = template.filename.replace(/\.docx$/, "_AI-filled.docx");
+    downloadBlob(
+      filename,
+      buildAiFilledTemplate(template, { elementCode, elementLabel, elementText }),
+    );
+    setFeedback(`AI-filled ${template.code} drafted and downloaded.`);
+    setTimeout(() => setFeedback(null), 3500);
+  }
+
+  return (
+    <div className="mt-2 rounded-lg border border-cyan-200 bg-cyan-50/40 px-3 py-2 print:hidden">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-cyan-700">
+        Recommended template
+      </p>
+      <div className="mt-1 flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-slate-900">
+            <span className="grid h-5 w-5 place-items-center rounded bg-white text-cyan-700 ring-1 ring-cyan-200">
+              <FaFileLines className="h-3 w-3" aria-hidden="true" />
+            </span>
+            <span className="truncate">
+              {template.code} — {template.title}
+            </span>
+          </p>
+          <p className="mt-0.5 truncate text-[10px] text-slate-500">
+            {template.filename}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={handleDownload}
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <FaDownload className="h-2.5 w-2.5" aria-hidden="true" />
+            Download template
+          </button>
+          <button
+            type="button"
+            onClick={handleAiFill}
+            className="inline-flex h-7 items-center gap-1 rounded-md bg-cyan-600 px-2 text-[11px] font-semibold text-white hover:bg-cyan-700"
+          >
+            <FaWandMagicSparkles className="h-2.5 w-2.5" aria-hidden="true" />
+            AI-fill &amp; download
+          </button>
+        </div>
+      </div>
+      {feedback && (
+        <p className="mt-1.5 text-[10px] font-medium text-emerald-700">{feedback}</p>
+      )}
+    </div>
+  );
+}
+
+function buildTemplateSkeleton({ code, title }) {
+  return [
+    `TITLE: ${title.toUpperCase()}`,
+    `IDENTIFICATION NUMBER: ${code}`,
+    `ORIGINAL DATE: January 2025`,
+    `LAST REVISION DATE: —`,
+    `HOSPITAL(S): XYZ HOSPITAL`,
+    `NEXT REVIEW DATE: January 2028`,
+    ``,
+    `PURPOSE (AIM):`,
+    `To establish standardized procedures, responsibilities, and quality standards for "${title}" at XYZ HOSPITAL, ensuring patient safety, regulatory compliance, operational consistency, and alignment with applicable accreditation standards.`,
+    ``,
+    `DEFINITION:`,
+    `Refer to the hospital glossary of terms; specific definitions for "${title}" shall be inserted by the policy owner where required.`,
+    ``,
+    `APPLIES TO:`,
+    `[ List target staff groups ]`,
+    ``,
+    `PATIENT GROUP:`,
+    `[ Define applicable patient cohort ]`,
+    ``,
+    `EXCEPTIONS:`,
+    `Any exception to this policy shall be documented, justified, and approved by the Department Head and Quality Department.`,
+    ``,
+    `TARGET AREAS:`,
+    `[ List clinical / operational areas ]`,
+    ``,
+    `PROTOCOLS:`,
+    `[ Insert hospital-specific protocols, roles, and responsibilities ]`,
+    ``,
+    `SPECIAL CONSIDERATIONS:`,
+    `[ Insert special considerations ]`,
+    ``,
+    `REFERENCES:`,
+    `[ Insert regulatory and accreditation references ]`,
+    ``,
+    `ATTACHMENTS:`,
+    `[ List attached forms, checklists, and consents ]`,
+  ].join("\n");
+}
+
+function buildAiFilledTemplate(template, element) {
+  return [
+    `TITLE: ${template.title.toUpperCase()}`,
+    `IDENTIFICATION NUMBER: ${template.code}`,
+    `ORIGINAL DATE: January 2025`,
+    `LAST REVISION DATE: —`,
+    `HOSPITAL(S): XYZ HOSPITAL`,
+    `NEXT REVIEW DATE: January 2028`,
+    ``,
+    `— DRAFT GENERATED BY INTEGRIIX AI —`,
+    `Source gap: ${element.elementCode} · ${element.elementLabel}`,
+    `Requirement text: ${element.elementText}`,
+    ``,
+    `PURPOSE (AIM):`,
+    `To define the standards and accountability framework that bring XYZ Hospital into compliance with ${element.elementCode} (${element.elementLabel}). This policy specifies the controls, roles, and review cadence required to address: ${element.elementText}`,
+    ``,
+    `DEFINITION:`,
+    `Key terms used in this policy follow the definitions in the XYZ Hospital glossary. For the purposes of ${element.elementCode}, the policy adopts the wording of the accreditation element verbatim where applicable.`,
+    ``,
+    `APPLIES TO:`,
+    `All staff whose duties intersect with the scope of ${element.elementCode}, including clinical, allied health, pharmacy, and supervisory personnel as relevant.`,
+    ``,
+    `PATIENT GROUP:`,
+    `All patients within the scope of ${template.title}, irrespective of age, gender, or service line, unless explicitly excluded below.`,
+    ``,
+    `EXCEPTIONS:`,
+    `Documented and time-limited exceptions approved by the Department Head and Quality Department.`,
+    ``,
+    `TARGET AREAS:`,
+    `Inpatient units, outpatient clinics, emergency department, pharmacy, and any unit with workflows touching ${element.elementLabel.toLowerCase()}.`,
+    ``,
+    `PROTOCOLS:`,
+    `1. The Department Head is the policy owner and is accountable for implementation, monitoring, and annual review.`,
+    `2. All affected staff shall be trained at induction and re-trained annually on the requirements of ${element.elementCode}.`,
+    `3. The hospital shall implement the controls described by ${element.elementCode}, with documented evidence retained in the unit's compliance file.`,
+    `4. KPIs aligned to ${element.elementCode} shall be reported quarterly to the Quality Committee.`,
+    `5. Any deviation shall be reported via the incident reporting system within 24 hours.`,
+    ``,
+    `SPECIAL CONSIDERATIONS:`,
+    `Where local regulation imposes a stricter standard than the accreditation element, the stricter standard prevails.`,
+    ``,
+    `REFERENCES:`,
+    `- ${element.elementCode}: ${element.elementLabel}`,
+    `- ${element.elementText}`,
+    `- XYZ Hospital Quality Manual, current edition.`,
+    ``,
+    `ATTACHMENTS:`,
+    `- Compliance checklist for ${element.elementCode}`,
+    `- Training acknowledgement form`,
+    `- KPI monitoring template`,
+    ``,
+    `(This is an AI-generated draft. Hospital subject-matter experts must review, edit, and approve before issue.)`,
+  ].join("\n");
+}
+
+function buildChecklistPdf(policy, bodySummaries, totals, overallPct, generatedAt) {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 40;
+  const contentWidth = pageWidth - margin * 2;
+  let y = margin;
+
+  function ensureSpace(needed) {
+    if (y + needed > pageHeight - margin) {
+      doc.addPage();
+      y = margin;
+    }
+  }
+
+  function drawTextBlock(text, options = {}) {
+    const {
+      size = 10,
+      style = "normal",
+      color = [30, 41, 59],
+      lineHeight = 1.35,
+      indent = 0,
+      maxWidth = contentWidth - indent,
+    } = options;
+    doc.setFontSize(size);
+    doc.setFont("helvetica", style);
+    doc.setTextColor(color[0], color[1], color[2]);
+    const lines = doc.splitTextToSize(String(text ?? ""), maxWidth);
+    const lh = size * lineHeight;
+    lines.forEach((line) => {
+      ensureSpace(lh);
+      doc.text(line, margin + indent, y + size);
+      y += lh;
+    });
+  }
+
+  function drawDivider() {
+    ensureSpace(8);
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y + 4, pageWidth - margin, y + 4);
+    y += 10;
+  }
+
+  // Header
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(14, 116, 144);
+  doc.text("POLICY ACCREDITATION CHECKLIST", margin, y + 9);
+  y += 18;
+
+  drawTextBlock(policy.title, { size: 16, style: "bold", color: [15, 23, 42] });
+  drawTextBlock(
+    `${policy.code} · ${policy.version} · ${policy.category} · ${policy.department}`,
+    { size: 10, color: [100, 116, 139] },
+  );
+  drawTextBlock(
+    `Owner: ${policy.owner} · Generated ${formatDateTime(generatedAt)}`,
+    { size: 10, color: [100, 116, 139] },
+  );
+
+  drawDivider();
+
+  // Summary stats
+  const statBoxes = [
+    { label: "Total elements", value: String(totals.total), bg: [241, 245, 249], fg: [51, 65, 85] },
+    {
+      label: "Covered",
+      value: `${totals.covered} (${overallPct}%)`,
+      bg: [236, 253, 245],
+      fg: [6, 95, 70],
+    },
+    { label: "Gaps", value: String(totals.gaps), bg: [254, 242, 242], fg: [153, 27, 27] },
+    {
+      label: "Critical gaps",
+      value: String(totals.critical),
+      bg: [255, 251, 235],
+      fg: [146, 64, 14],
+    },
+  ];
+  const statW = (contentWidth - 12) / 4;
+  const statH = 48;
+  ensureSpace(statH + 12);
+  statBoxes.forEach((stat, idx) => {
+    const x = margin + idx * (statW + 4);
+    doc.setFillColor(stat.bg[0], stat.bg[1], stat.bg[2]);
+    doc.roundedRect(x, y, statW, statH, 4, 4, "F");
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(stat.fg[0], stat.fg[1], stat.fg[2]);
+    doc.text(stat.label.toUpperCase(), x + 8, y + 14);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text(stat.value, x + 8, y + 34);
+  });
+  y += statH + 14;
+
+  // Body sections
+  bodySummaries.forEach(({ body, data, total, coveragePct }) => {
+    ensureSpace(48);
+
+    // Body header bar
+    doc.setFillColor(15, 23, 42);
+    doc.roundedRect(margin, y, 44, 18, 3, 3, "F");
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(255, 255, 255);
+    doc.text(body, margin + 6, y + 12);
+
+    doc.setTextColor(51, 65, 85);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("Standards crosswalk", margin + 54, y + 12);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    const coverageText = `${data.covered.length}/${total} covered (${coveragePct}%)`;
+    const cw = doc.getTextWidth(coverageText);
+    doc.text(coverageText, pageWidth - margin - cw, y + 12);
+    y += 24;
+
+    const items = [
+      ...data.covered.map((el) => ({
+        status: "covered",
+        code: el.code,
+        label: el.label,
+        text: el.text,
+        meta: el.citation ? `Citation: ${el.citation.label}` : "",
+        metaText: el.citation?.excerpt ?? "",
+        severity: "",
+      })),
+      ...data.gaps.map((el) => ({
+        status: "gap",
+        code: el.code,
+        label: el.label,
+        text: el.text,
+        meta: `Gap · ${el.severity}`,
+        metaText: el.remediation ?? "",
+        severity: el.severity,
+      })),
+    ];
+
+    if (items.length === 0) {
+      drawTextBlock("No elements defined for this body.", {
+        size: 9,
+        color: [100, 116, 139],
+        indent: 6,
+      });
+      y += 6;
+      return;
+    }
+
+    items.forEach((it) => {
+      ensureSpace(40);
+
+      // Checkbox
+      const boxX = margin;
+      const boxY = y + 2;
+      const boxSize = 10;
+      doc.setDrawColor(148, 163, 184);
+      doc.setLineWidth(0.6);
+      doc.rect(boxX, boxY, boxSize, boxSize);
+      if (it.status === "covered") {
+        doc.setDrawColor(5, 150, 105);
+        doc.setLineWidth(1.4);
+        doc.line(boxX + 2, boxY + 5, boxX + 4.5, boxY + 8);
+        doc.line(boxX + 4.5, boxY + 8, boxX + 8.5, boxY + 2.5);
+      }
+
+      // Code badge
+      const codeText = it.code;
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      const codeW = doc.getTextWidth(codeText) + 8;
+      const codeX = margin + 18;
+      const codeY = y;
+      const codeColor = it.status === "covered" ? [5, 150, 105] : [220, 38, 38];
+      doc.setFillColor(codeColor[0], codeColor[1], codeColor[2]);
+      doc.roundedRect(codeX, codeY, codeW, 12, 2, 2, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.text(codeText, codeX + 4, codeY + 8.5);
+
+      // Label
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(15, 23, 42);
+      const labelStartX = codeX + codeW + 6;
+      let severityText = "";
+      let severityW = 0;
+      if (it.severity) {
+        severityText = it.severity;
+        doc.setFontSize(8);
+        severityW = doc.getTextWidth(severityText) + 10;
+        doc.setFontSize(10);
+      }
+      const labelMaxW = pageWidth - margin - labelStartX - severityW - 4;
+      const labelLines = doc.splitTextToSize(it.label, labelMaxW);
+      doc.text(labelLines[0], labelStartX, y + 9);
+
+      // Severity pill
+      if (it.severity) {
+        const sevX = pageWidth - margin - severityW;
+        const sevColors =
+          it.severity === "Critical"
+            ? { fill: [254, 226, 226], text: [153, 27, 27] }
+            : { fill: [253, 230, 138], text: [146, 64, 14] };
+        doc.setFillColor(sevColors.fill[0], sevColors.fill[1], sevColors.fill[2]);
+        doc.roundedRect(sevX, y, severityW, 12, 6, 6, "F");
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(sevColors.text[0], sevColors.text[1], sevColors.text[2]);
+        doc.text(severityText, sevX + 5, y + 8.5);
+      }
+      y += 16;
+
+      // Description
+      drawTextBlock(it.text, {
+        size: 9,
+        color: [71, 85, 105],
+        indent: 18,
+      });
+
+      // Meta
+      if (it.meta) {
+        drawTextBlock(it.meta.toUpperCase(), {
+          size: 7,
+          style: "bold",
+          color: it.status === "covered" ? [4, 120, 87] : [185, 28, 28],
+          indent: 18,
+        });
+      }
+      if (it.metaText) {
+        drawTextBlock(
+          it.status === "covered" ? `"${it.metaText}"` : it.metaText,
+          {
+            size: 9,
+            color: [71, 85, 105],
+            indent: 18,
+          },
+        );
+      }
+
+      y += 4;
+      doc.setDrawColor(241, 245, 249);
+      doc.setLineWidth(0.4);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 6;
+    });
+
+    y += 8;
+  });
+
+  // Footer
+  ensureSpace(30);
+  drawDivider();
+  drawTextBlock(
+    "Demo mode — values are illustrative. Coverage and gap detection are simulated from the policy text. Verify against the published accreditation manuals before formal submission.",
+    { size: 8, color: [100, 116, 139] },
+  );
+
+  // Page numbers
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i += 1) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(148, 163, 184);
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 16, {
+      align: "right",
+    });
+    doc.text(
+      `${policy.code} · Accreditation checklist`,
+      margin,
+      pageHeight - 16,
+    );
+  }
+
+  return doc;
+}
 export default PolicyDetail;
