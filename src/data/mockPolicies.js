@@ -2,7 +2,7 @@ const fixedDetailById = {
   "pol-001": {
     summary:
       "Establishes prevention, screening, treatment, and return-to-duty procedures for staff dealing with alcohol or drug abuse, with confidentiality and EAP referral pathways.",
-    appliesTo: ["All HMC staff", "Contractors", "Volunteers"],
+    appliesTo: ["All staff", "Contractors", "Volunteers"],
     keyClauses: [
       "Mandatory pre-employment and random testing for safety-sensitive roles.",
       "Confidential self-referral pathway via Employee Assistance Programme.",
@@ -64,9 +64,13 @@ function shiftDate(isoDate, days) {
 }
 
 export function getPolicyDetail(id) {
-  const policy = mockPolicies.find((p) => p.id === id);
+  return buildPolicyDetail(mockPolicies.find((p) => p.id === id));
+}
+
+export function buildPolicyDetail(policy) {
   if (!policy) return null;
 
+  const id = policy.id;
   const fixed = fixedDetailById[id] ?? {
     summary: `${policy.title} sets the standard for ${policy.department.toLowerCase()} operations and aligns the organisation with ${policy.accreditationTags.join(", ") || "internal governance"} expectations.`,
     appliesTo: [policy.department, "Departmental leads", "All affected staff"],
@@ -77,11 +81,35 @@ export function getPolicyDetail(id) {
     ],
   };
 
-  const versionNumber = parseFloat(policy.version.replace("v", "")) || 1;
-  const versionsCount = Math.min(4, Math.max(2, Math.floor(versionNumber)));
-  const versions = Array.from({ length: versionsCount }, (_, idx) => {
-    const versionLabel = `v${(versionNumber - idx).toFixed(1)}`;
-    const uploadedDate = shiftDate(policy.lastUpdated, -idx * 220);
+  const uploadedExtras = Array.isArray(policy.uploadedVersions)
+    ? policy.uploadedVersions
+    : [];
+  const uploadedLabels = new Set(uploadedExtras.map((v) => v.version));
+
+  const baseVersionNumber =
+    parseFloat(policy.version.replace("v", "")) || 1;
+  const baseVersionLabel = `v${baseVersionNumber.toFixed(1)}`;
+  const generatedAnchor = uploadedExtras.length
+    ? Math.max(
+        1,
+        Math.floor(
+          parseFloat(
+            (uploadedExtras[uploadedExtras.length - 1].version ?? baseVersionLabel)
+              .replace(/^v/i, ""),
+          ),
+        ),
+      )
+    : Math.floor(baseVersionNumber);
+  const versionsCount = Math.min(4, Math.max(2, generatedAnchor));
+  const generatedVersions = Array.from({ length: versionsCount }, (_, idx) => {
+    let versionLabel = `v${(generatedAnchor - idx).toFixed(1)}`;
+    let bump = 1;
+    while (uploadedLabels.has(versionLabel)) {
+      versionLabel = `v${(generatedAnchor - idx - bump * 0.1).toFixed(1)}`;
+      bump += 1;
+      if (bump > 50) break;
+    }
+    const uploadedDate = shiftDate(policy.lastUpdated, -(idx + 1) * 220);
     const actor =
       activityActorPool[
         deterministicNumber(`${id}-version-${idx}`, activityActorPool.length)
@@ -99,9 +127,15 @@ export function getPolicyDetail(id) {
             : idx === 2
               ? "Aligned roles with new HR structure; expanded definitions."
               : "Initial controlled release approved by governance committee.",
-      isCurrent: idx === 0,
+      isCurrent: false,
     };
   });
+
+  const merged = [
+    ...uploadedExtras.map((v) => ({ ...v, isCurrent: false })),
+    ...generatedVersions,
+  ];
+  const versions = merged.map((v, idx) => ({ ...v, isCurrent: idx === 0 }));
 
   const ackPercent = 55 + deterministicNumber(`${id}-ack`, 41);
   const acknowledgements = {
@@ -208,7 +242,221 @@ export function getPolicyDetail(id) {
       acknowledgements,
       jciTags,
       activity,
+      aiInsights: buildAiInsights(policy, fixed),
     },
+  };
+}
+
+const accreditationBodies = ["JCI", "CBAHI", "DoH", "JAWDA"];
+
+const gapElementLibrary = {
+  JCI: [
+    {
+      code: "MMU.4",
+      label: "Medication Use — prescribing & ordering",
+      text: "The hospital uses safe processes for prescribing, ordering, and transcribing medications, with qualifications of those who may prescribe defined in policy.",
+    },
+    {
+      code: "MMU.5",
+      label: "Medication Use — preparation & dispensing",
+      text: "Medications are prepared and dispensed in a safe and clean environment by trained personnel using verified controls.",
+    },
+    {
+      code: "MMU.6",
+      label: "Medication Use — administration",
+      text: "Medications are administered safely by qualified individuals, with patient identity verification and second-person checks for high-alert drugs.",
+    },
+    {
+      code: "IPSG.3",
+      label: "Patient Safety Goal — high-alert medications",
+      text: "The organisation develops an approach to improve the safety of high-alert medications, including storage, labelling, and administration controls.",
+    },
+    {
+      code: "GLD.6",
+      label: "Governance, Leadership & Direction",
+      text: "Leaders ensure compliance with laws and regulations, and approve, communicate, and review the organisation's policies.",
+    },
+    {
+      code: "QPS.5",
+      label: "Quality & Patient Safety improvement",
+      text: "Validated data is used for prioritising improvement activities and is communicated to staff to support patient safety.",
+    },
+    {
+      code: "SQE.8",
+      label: "Staff Qualifications & Education",
+      text: "Continuing education and training are provided to maintain or advance staff skills and knowledge.",
+    },
+    {
+      code: "PCC.2",
+      label: "Patient-Centred Care",
+      text: "Care is delivered in a manner respectful of patient values, preferences, and the dignity of every individual.",
+    },
+  ],
+  CBAHI: [
+    {
+      code: "LD.10",
+      label: "Leadership — policy approval & dissemination",
+      text: "Leaders ensure approved policies are communicated to all affected staff with documented evidence of acknowledgement.",
+    },
+    {
+      code: "MM.05",
+      label: "Medication Management — high-alert drugs",
+      text: "Hospital establishes a list of high-alert medications and controls including limited access and double-checks.",
+    },
+    {
+      code: "PR.04",
+      label: "Patient Rights — informed decision-making",
+      text: "Patients receive information necessary to make informed decisions about their care.",
+    },
+  ],
+  DoH: [
+    {
+      code: "DoH-PS-04",
+      label: "Patient Safety — incident reporting",
+      text: "Healthcare providers must report serious adverse events through the DoH Adverse Event Notification System within defined timeframes.",
+    },
+    {
+      code: "DoH-PRG-12",
+      label: "Programme Governance",
+      text: "Each clinical programme requires documented governance, ownership, and annual review by the responsible committee.",
+    },
+    {
+      code: "DoH-WF-07",
+      label: "Workforce Credentialing",
+      text: "All licensed practitioners must hold valid DoH licences and undergo periodic credentialing review.",
+    },
+  ],
+  JAWDA: [
+    {
+      code: "JAWDA-Q1",
+      label: "Quality KPI Reporting",
+      text: "Facilities submit quarterly quality KPIs covering safety, mortality, and patient experience to JAWDA in defined data fields.",
+    },
+    {
+      code: "JAWDA-PE-2",
+      label: "Patient Experience standard",
+      text: "Patient experience surveys must be conducted using approved instruments with results reported to leadership.",
+    },
+  ],
+};
+
+function buildAiInsights(policy, fixed) {
+  const seed = policy.id;
+  const summary = {
+    sentences: [
+      fixed.summary,
+      `It applies to ${fixed.appliesTo.slice(0, 2).join(" and ")} and is owned by the ${policy.owner}.`,
+      `The policy was last updated on ${policy.lastUpdated} and is due for review on ${policy.nextReview}.`,
+    ],
+    citations: [
+      {
+        id: `${seed}-cite-1`,
+        label: "Para 1.2",
+        title: "Purpose & Scope",
+        excerpt: fixed.summary,
+      },
+      {
+        id: `${seed}-cite-2`,
+        label: "Para 3.2",
+        title: "Roles & Responsibilities",
+        excerpt: `The ${policy.owner} is accountable for implementation, with the ${policy.department} responsible for day-to-day adherence and exception handling.`,
+      },
+      {
+        id: `${seed}-cite-3`,
+        label: "Para 5.1",
+        title: "Review Cycle",
+        excerpt: `This policy is reviewed at least annually and on any change in regulation, with the next scheduled review on ${policy.nextReview}.`,
+      },
+    ],
+  };
+
+  const gapAnalysis = accreditationBodies.reduce((map, body) => {
+    const library = gapElementLibrary[body] ?? [];
+    const offset = deterministicNumber(`${seed}-${body}`, Math.max(1, library.length));
+    const coveredCount = Math.min(library.length, 2 + (offset % 2));
+    const covered = library.slice(0, coveredCount).map((element, idx) => ({
+      ...element,
+      citation: {
+        label: `Para ${3 + idx}.${1 + (idx % 3)}`,
+        excerpt: `The policy references ${element.label.toLowerCase()} in section ${3 + idx} via the ${policy.department} workflow.`,
+      },
+    }));
+    const gaps = library.slice(coveredCount).slice(0, 2).map((element) => ({
+      ...element,
+      severity:
+        element.code.includes("IPSG") || element.code.startsWith("DoH-PS")
+          ? "Critical"
+          : "Moderate",
+      remediation: `Add a clause covering ${element.label.toLowerCase()} with explicit owner and timing.`,
+    }));
+    map[body] = { covered, gaps };
+    return map;
+  }, {});
+
+  const tagSuggestionPool = [
+    {
+      code: "MMU.4",
+      label: "Medication Use — prescribing & ordering",
+      confidence: 0.92,
+      rationale: "Strong textual match on prescriber accountability clauses.",
+    },
+    {
+      code: "IPSG.3",
+      label: "Patient Safety Goal — high-alert medications",
+      confidence: 0.88,
+      rationale: "Two-person verification language detected in section 4.",
+    },
+    {
+      code: "GLD.6",
+      label: "Governance, Leadership & Direction",
+      confidence: 0.83,
+      rationale: "Approval and review cadence references map to GLD.6.",
+    },
+    {
+      code: "QPS.5",
+      label: "Quality & Patient Safety improvement",
+      confidence: 0.74,
+      rationale: "Linked to incident review and CAPA closure obligations.",
+    },
+    {
+      code: "SQE.8",
+      label: "Staff Qualifications & Education",
+      confidence: 0.69,
+      rationale: "Acknowledgement and education clauses present.",
+    },
+    {
+      code: "PCC.2",
+      label: "Patient-Centred Care",
+      confidence: 0.61,
+      rationale: "Patient communication language detected — confidence moderate.",
+    },
+  ];
+
+  const tagOffset = deterministicNumber(`${seed}-tag-suggestions`, 3);
+  const suggestions = tagSuggestionPool
+    .slice(tagOffset, tagOffset + 5)
+    .concat(tagSuggestionPool.slice(0, Math.max(0, tagOffset + 5 - tagSuggestionPool.length)))
+    .slice(0, 5)
+    .map((tag, idx) => ({
+      ...tag,
+      id: `${seed}-tag-${idx}`,
+      source: "ai",
+    }));
+
+  const manualTag = {
+    id: `${seed}-tag-manual`,
+    code: "MOI.4",
+    label: "Management of Information — record retention",
+    rationale: "Manually added by Privacy Officer during last review.",
+    confidence: null,
+    source: "manual",
+  };
+
+  return {
+    summary,
+    gapAnalysis,
+    tagSuggestions: suggestions,
+    confirmedTags: [manualTag],
   };
 }
 
@@ -515,5 +763,64 @@ export const mockPolicies = [
     lastUpdated: "2025-09-19",
     nextReview: "2026-09-19",
     accreditationTags: ["JCI"],
+  },
+];
+
+export const policyOwners = [
+  { id: "u-001", name: "Director of Human Resources", role: "HR Leadership" },
+  { id: "u-002", name: "Chief Medical Officer", role: "Medical Affairs" },
+  { id: "u-003", name: "Chief Nursing Officer", role: "Nursing" },
+  { id: "u-004", name: "Director of Pharmacy", role: "Pharmacy" },
+  { id: "u-005", name: "Chief Compliance Officer", role: "Compliance" },
+  { id: "u-006", name: "Privacy Officer", role: "Information Governance" },
+  { id: "u-007", name: "Head of Security", role: "Security" },
+  { id: "u-008", name: "Occupational Health Lead", role: "Occupational Health" },
+  { id: "u-009", name: "Infection Control Lead", role: "Infection Prevention" },
+  { id: "u-010", name: "ICU Medical Director", role: "Intensive Care" },
+  { id: "u-011", name: "Credentialing Committee", role: "Medical Affairs" },
+  { id: "u-012", name: "Transfusion Committee", role: "Laboratory" },
+  { id: "u-013", name: "Department of Hematology", role: "Hematology" },
+];
+
+export const audienceRules = [
+  {
+    id: "all-staff",
+    label: "All staff",
+    description: "Every employee, contractor, and volunteer.",
+  },
+  {
+    id: "clinical-departments",
+    label: "Clinical departments",
+    description: "All clinical-facing teams across the hospital.",
+  },
+  {
+    id: "nursing",
+    label: "Nursing — all units",
+    description: "Every nursing team, including bedside and float pools.",
+  },
+  {
+    id: "icu-nurses",
+    label: "ICU nurses only",
+    description: "Critical care and step-down nursing staff.",
+  },
+  {
+    id: "ed-clinicians",
+    label: "Emergency Department clinicians",
+    description: "ED physicians, nurses, and triage staff.",
+  },
+  {
+    id: "pharmacy",
+    label: "Pharmacy team",
+    description: "Inpatient and outpatient pharmacy personnel.",
+  },
+  {
+    id: "physicians",
+    label: "All physicians",
+    description: "Attending, fellow, resident, and visiting physicians.",
+  },
+  {
+    id: "leadership",
+    label: "Department leadership",
+    description: "Heads of department and senior leaders only.",
   },
 ];

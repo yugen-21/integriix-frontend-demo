@@ -2,12 +2,66 @@
   {
     "name": "Daily Brief",
     "url": "/",
-    "icon": "FaRegNewspaper"
+    "icon": "FaRegNewspaper",
+    "submenu": [
+      {
+        "name": "Key financial trend",
+        "url": "/#key-financial-trend",
+        "icon": "FaChartLine"
+      },
+      {
+        "name": "Total score",
+        "url": "/#total-score",
+        "icon": "FaGauge"
+      },
+      {
+        "name": "Critical alerts",
+        "url": "/#critical-alerts",
+        "icon": "FaTriangleExclamation"
+      },
+      {
+        "name": "Top risk and opportunities",
+        "url": "/#risks-opportunities",
+        "icon": "FaScaleBalanced"
+      },
+      {
+        "name": "Due today",
+        "url": "/#due-today",
+        "icon": "FaCalendarDay"
+      }
+    ]
   },
   {
     "name": "Policy Management",
     "url": "/policy-management",
-    "icon": "FaFileContract"
+    "icon": "FaFileContract",
+    "submenu": [
+      {
+        "name": "Policy List",
+        "url": "/policy-management",
+        "icon": "FaFileLines"
+      },
+      {
+        "name": "Compliance Dashboard",
+        "url": "/compliance",
+        "icon": "FaChartColumn"
+      },
+      {
+        "name": "Reviewer Queue",
+        "url": "/reviewer-queue",
+        "icon": "FaListCheck"
+      },
+      {
+        "name": "Overdue Policies",
+        "url": "/overdue",
+        "icon": "FaTriangleExclamation"
+      },
+      {
+        "name": "Search",
+        "url": "/search",
+        "icon": "FaWandMagicSparkles"
+      }
+    ]
   },
   {
     "name": "Financials",

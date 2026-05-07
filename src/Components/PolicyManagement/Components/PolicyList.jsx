@@ -9,11 +9,7 @@ import {
   FaPlus,
   FaTriangleExclamation,
 } from "react-icons/fa6";
-import {
-  mockPolicies,
-  policyCategories,
-  policyStatuses,
-} from "../../../data";
+import { policyCategories, policyStatuses } from "../../../data";
 
 const TODAY = new Date("2026-05-06T00:00:00+05:30");
 const PAGE_SIZE = 8;
@@ -44,7 +40,7 @@ function daysUntil(dateValue) {
   return Math.round(diffMs / (1000 * 60 * 60 * 24));
 }
 
-function PolicyList({ onSelect }) {
+function PolicyList({ policies, onSelect, onCreate, onEdit }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All");
@@ -55,7 +51,7 @@ function PolicyList({ onSelect }) {
   const filteredPolicies = useMemo(() => {
     const term = search.trim().toLowerCase();
 
-    return mockPolicies.filter((policy) => {
+    return policies.filter((policy) => {
       if (statusFilter !== "All" && policy.status !== statusFilter) return false;
       if (categoryFilter !== "All" && policy.category !== categoryFilter)
         return false;
@@ -76,7 +72,7 @@ function PolicyList({ onSelect }) {
 
       return true;
     });
-  }, [search, statusFilter, categoryFilter, overdueOnly]);
+  }, [policies, search, statusFilter, categoryFilter, overdueOnly]);
 
   const totalPages = Math.max(1, Math.ceil(filteredPolicies.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -85,10 +81,9 @@ function PolicyList({ onSelect }) {
     safePage * PAGE_SIZE,
   );
 
-  const overdueCount = mockPolicies.filter((p) => isOverdue(p.nextReview))
-    .length;
-  const activeCount = mockPolicies.filter((p) => p.status === "Active").length;
-  const inReviewCount = mockPolicies.filter((p) => p.status === "In Review")
+  const overdueCount = policies.filter((p) => isOverdue(p.nextReview)).length;
+  const activeCount = policies.filter((p) => p.status === "Active").length;
+  const inReviewCount = policies.filter((p) => p.status === "In Review")
     .length;
 
   function resetFilters() {
@@ -109,7 +104,7 @@ function PolicyList({ onSelect }) {
   return (
     <div className="grid min-w-0 gap-5 max-[900px]:gap-4">
       <PolicyHeader
-        total={mockPolicies.length}
+        total={policies.length}
         active={activeCount}
         inReview={inReviewCount}
         overdue={overdueCount}
@@ -191,11 +186,12 @@ function PolicyList({ onSelect }) {
             )}
 
             <span className="ml-auto text-[11px] text-slate-500">
-              {filteredPolicies.length} of {mockPolicies.length} policies
+              {filteredPolicies.length} of {policies.length} policies
             </span>
 
             <button
               type="button"
+              onClick={onCreate}
               className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800"
             >
               <FaPlus className="h-3 w-3" aria-hidden="true" />
@@ -249,6 +245,7 @@ function PolicyList({ onSelect }) {
                     }
                     onCloseMenu={() => setOpenMenuId(null)}
                     onSelect={onSelect}
+                    onEdit={onEdit}
                   />
                 ))
               )}
@@ -364,7 +361,14 @@ function PolicyHeader({ total, active, inReview, overdue }) {
   );
 }
 
-function PolicyRow({ policy, isMenuOpen, onToggleMenu, onCloseMenu, onSelect }) {
+function PolicyRow({
+  policy,
+  isMenuOpen,
+  onToggleMenu,
+  onCloseMenu,
+  onSelect,
+  onEdit,
+}) {
   const overdue = isOverdue(policy.nextReview);
   const days = daysUntil(policy.nextReview);
   const dueSoon = !overdue && days <= 30;
@@ -489,7 +493,10 @@ function PolicyRow({ policy, isMenuOpen, onToggleMenu, onCloseMenu, onSelect }) 
                 <button
                   type="button"
                   className="block w-full px-3 py-2 text-left text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                  onClick={onCloseMenu}
+                  onClick={() => {
+                    onCloseMenu();
+                    onEdit?.(policy.id);
+                  }}
                 >
                   Edit
                 </button>

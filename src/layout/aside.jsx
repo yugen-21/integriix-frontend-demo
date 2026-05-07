@@ -3,23 +3,40 @@ import * as FaIcons from "react-icons/fa6";
 import { FaChevronDown, FaChevronUp, FaXmark } from "react-icons/fa6";
 import menuItems from "../menu.json";
 
-const dailyBriefSubItems = [
-  { name: "Key financial trend", url: "/#key-financial-trend" },
-  { name: "Total score", url: "/#total-score" },
-  { name: "Critical alerts", url: "/#critical-alerts" },
-  { name: "Top risk and opportunities", url: "/#risks-opportunities" },
-  { name: "Due today", url: "/#due-today" },
-];
-
 function MenuIcon({ name }) {
   const Icon = FaIcons[name] ?? FaIcons.FaCircle;
 
   return <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />;
 }
 
+function SubMenuIcon({ name }) {
+  const Icon = FaIcons[name] ?? FaIcons.FaCircle;
+
+  return <Icon className="h-3 w-3 shrink-0" aria-hidden="true" />;
+}
+
 function Aside({ isOpen = false, onClose }) {
   const currentPath = window.location.pathname;
-  const [isDailyBriefOpen, setIsDailyBriefOpen] = useState(true);
+
+  const initialOpenIds = new Set();
+  menuItems.forEach((item) => {
+    if (
+      item.submenu?.some((sub) => sub.url === currentPath) ||
+      item.url === currentPath
+    ) {
+      initialOpenIds.add(item.name);
+    }
+  });
+  const [openSections, setOpenSections] = useState(initialOpenIds);
+
+  function toggleSection(name) {
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
 
   return (
     <>
@@ -65,13 +82,19 @@ function Aside({ isOpen = false, onClose }) {
         <nav className="relative mt-7 grid gap-2">
           {menuItems.map((item) => {
             const isActive = currentPath === item.url;
+            const submenu = item.submenu ?? [];
+            const hasSubmenu = submenu.length > 0;
+            const isExpanded = openSections.has(item.name);
+            const childActive = item.submenu?.some(
+              (sub) => sub.url === currentPath,
+            );
 
             return (
               <div key={item.name}>
                 <div className="flex items-center gap-2">
                   <a
                     className={
-                      isActive
+                      isActive || childActive
                         ? "flex min-w-0 flex-1 items-center gap-3 rounded-xl bg-cyan-500/20 px-3 py-3 text-sm font-semibold text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.09)]"
                         : "flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-blue-100/80 transition hover:bg-white/8 hover:text-white"
                     }
@@ -81,7 +104,7 @@ function Aside({ isOpen = false, onClose }) {
                   >
                     <span
                       className={
-                        isActive
+                        isActive || childActive
                           ? "grid h-8 w-8 place-items-center rounded-lg bg-cyan-400 text-slate-950"
                           : "grid h-8 w-8 place-items-center rounded-lg bg-white/8 text-cyan-100"
                       }
@@ -91,19 +114,19 @@ function Aside({ isOpen = false, onClose }) {
                     <span className="break-words">{item.name}</span>
                   </a>
 
-                  {item.name === "Daily Brief" ? (
+                  {hasSubmenu ? (
                     <button
                       className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/8 text-cyan-100 transition hover:bg-white/12 hover:text-white"
                       type="button"
-                      aria-expanded={isDailyBriefOpen}
+                      aria-expanded={isExpanded}
                       aria-label={
-                        isDailyBriefOpen
-                          ? "Collapse Daily Brief menu"
-                          : "Expand Daily Brief menu"
+                        isExpanded
+                          ? `Collapse ${item.name} menu`
+                          : `Expand ${item.name} menu`
                       }
-                      onClick={() => setIsDailyBriefOpen((value) => !value)}
+                      onClick={() => toggleSection(item.name)}
                     >
-                      {isDailyBriefOpen ? (
+                      {isExpanded ? (
                         <FaChevronUp
                           className="h-3.5 w-3.5"
                           aria-hidden="true"
@@ -118,18 +141,37 @@ function Aside({ isOpen = false, onClose }) {
                   ) : null}
                 </div>
 
-                {item.name === "Daily Brief" && isDailyBriefOpen ? (
+                {hasSubmenu && isExpanded ? (
                   <div className="ml-11 mt-2 grid gap-1 border-l border-white/10 pl-3">
-                    {dailyBriefSubItems.map((subItem) => (
-                      <a
-                        key={subItem.name}
-                        className="rounded-lg px-3 py-2 text-xs font-semibold text-blue-100/70 transition hover:bg-white/8 hover:text-white"
-                        href={subItem.url}
-                        onClick={onClose}
-                      >
-                        {subItem.name}
-                      </a>
-                    ))}
+                    {submenu.map((subItem) => {
+                      const subActive = currentPath === subItem.url;
+                      return (
+                        <a
+                          key={subItem.name}
+                          className={
+                            subActive
+                              ? "flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white"
+                              : "flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-blue-100/70 transition hover:bg-white/8 hover:text-white"
+                          }
+                          href={subItem.url}
+                          aria-current={subActive ? "page" : undefined}
+                          onClick={onClose}
+                        >
+                          {subItem.icon ? (
+                            <span
+                              className={
+                                subActive
+                                  ? "grid h-5 w-5 place-items-center rounded-md bg-cyan-400 text-slate-950"
+                                  : "grid h-5 w-5 place-items-center rounded-md bg-white/8 text-cyan-100"
+                              }
+                            >
+                              <SubMenuIcon name={subItem.icon} />
+                            </span>
+                          ) : null}
+                          <span className="break-words">{subItem.name}</span>
+                        </a>
+                      );
+                    })}
                   </div>
                 ) : null}
               </div>
