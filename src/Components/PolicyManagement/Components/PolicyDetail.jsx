@@ -35,6 +35,7 @@ import {
 } from "react-icons/fa6";
 import jsPDF from "jspdf";
 import VersionUploader from "./VersionUploader";
+import policyAPI from "../../../services/policyAPI";
 
 const TODAY = new Date("2026-05-06T00:00:00+05:30");
 
@@ -2204,9 +2205,12 @@ function TemplateRecommendation({
   const [feedback, setFeedback] = useState(null);
 
   function downloadBlob(filename, body) {
-    const blob = new Blob([body], {
-      type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    });
+    const blob =
+      body instanceof Blob
+        ? body
+        : new Blob([body], {
+            type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -2217,9 +2221,19 @@ function TemplateRecommendation({
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
 
-  function handleDownload() {
-    downloadBlob(template.filename, buildTemplateSkeleton(template));
-    setFeedback(`Downloaded ${template.code} skeleton template.`);
+  async function handleDownload() {
+    try {
+      const response = await policyAPI.downloadTemplate(template.code);
+      downloadBlob(template.filename, response.data);
+      setFeedback(`Downloaded ${template.code} template.`);
+    } catch (err) {
+      const status = err?.response?.status;
+      setFeedback(
+        status === 404
+          ? `Template ${template.code} is missing on the server.`
+          : `Failed to download ${template.code}.`,
+      );
+    }
     setTimeout(() => setFeedback(null), 3500);
   }
 
@@ -2264,14 +2278,6 @@ function TemplateRecommendation({
           >
             <FaDownload className="h-2.5 w-2.5" aria-hidden="true" />
             Download template
-          </button>
-          <button
-            type="button"
-            onClick={handleAiFill}
-            className="inline-flex h-7 items-center gap-1 rounded-md bg-cyan-600 px-2 text-[11px] font-semibold text-white hover:bg-cyan-700"
-          >
-            <FaWandMagicSparkles className="h-2.5 w-2.5" aria-hidden="true" />
-            AI-fill &amp; download
           </button>
         </div>
       </div>
