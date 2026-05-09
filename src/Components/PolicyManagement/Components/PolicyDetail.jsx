@@ -1,4 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  changeStatus,
+  fetchAudit,
+  fetchPolicyVersions,
+  runAudit,
+} from "../../../store/policiesSlice";
 import {
   FaArrowLeft,
   FaArrowRight,
@@ -26,7 +34,6 @@ import {
   FaWandMagicSparkles,
 } from "react-icons/fa6";
 import jsPDF from "jspdf";
-import { buildPolicyDetail } from "../../../data";
 import VersionUploader from "./VersionUploader";
 
 const TODAY = new Date("2026-05-06T00:00:00+05:30");
@@ -39,23 +46,33 @@ const statusStyles = {
   Archived: "bg-slate-100 text-slate-500 ring-slate-200",
 };
 
-const transitionMap = {
-  Draft: "In Review",
-  "In Review": "Approved",
-  Approved: "Active",
-  Active: "Archived",
-  Archived: null,
+// Backend currently allows any-to-any transitions (no auth → governance is
+// in the activity log, not the state machine). Mirror that here: every
+// current state can move to any other state. Tighten if/when the backend
+// re-introduces a real workflow.
+const ALL_STATUS_LABELS = ["Draft", "In Review", "Active", "Archived"];
+const ALLOWED_TRANSITIONS = ALL_STATUS_LABELS.reduce((acc, s) => {
+  acc[s] = ALL_STATUS_LABELS.filter((t) => t !== s);
+  return acc;
+}, {});
+
+const STATUS_UI_TO_API = {
+  Draft: "draft",
+  "In Review": "in_review",
+  Active: "published",
+  Archived: "archived",
 };
 
 const TABS = [
   { id: "overview", label: "Overview", Icon: FaFileLines },
   { id: "versions", label: "Versions", Icon: FaClockRotateLeft },
   { id: "checklist", label: "Checklist", Icon: FaSquareCheck },
-  { id: "ai", label: "AI", Icon: FaWandMagicSparkles },
+  // { id: "ai", label: "AI", Icon: FaWandMagicSparkles },
   { id: "activity", label: "Activity", Icon: FaListCheck },
 ];
 
 function formatDate(value) {
+  if (!value) return "—";
   return new Intl.DateTimeFormat("en", {
     year: "numeric",
     month: "short",
@@ -64,6 +81,7 @@ function formatDate(value) {
 }
 
 function formatDateTime(value) {
+  if (!value) return "—";
   return new Intl.DateTimeFormat("en", {
     year: "numeric",
     month: "short",
@@ -74,14 +92,173 @@ function formatDateTime(value) {
 }
 
 function isOverdue(dateValue) {
+  if (!dateValue) return false;
   return new Date(dateValue) < TODAY;
 }
 
-function PolicyDetail({ policy: policyInput, onBack, onEdit, onUploadVersion }) {
-  const policy = useMemo(() => buildPolicyDetail(policyInput), [policyInput]);
-  const [activeTab, setActiveTab] = useState("overview");
-  const [status, setStatus] = useState(policy?.status ?? "Draft");
+function StatusPicker({
+  targets,
+  isTransitioning,
+  onPick,
+  variant = "primary",
+  fullWidth = false,
+  currentStatus,
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef(null);
+  const [coords, setCoords] = useState(null);
+
+  // Position the menu under the trigger every time the popover opens, and
+  // keep it correct on scroll / resize. We render through a portal to escape
+  // any `overflow: hidden` ancestor (the detail header has one for the
+  // decorative gradient).
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    function place() {
+      const node = triggerRef.current;
+      if (!node) return;
+      const rect = node.getBoundingClientRect();
+      const MENU_WIDTH = Math.max(200, rect.width);
+      // Left-align the menu under the trigger, then clamp inside viewport
+      // so we never spill off the right edge.
+      const left = Math.max(
+        8,
+        Math.min(rect.left, window.innerWidth - MENU_WIDTH - 8),
+      );
+      setCoords({ top: rect.bottom + 4, left, width: MENU_WIDTH });
+    }
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    function onKey(e) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  const triggerBase =
+    "inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60";
+  const triggerVariant =
+    variant === "primary"
+      ? "bg-slate-900 text-white shadow-sm hover:-translate-y-0.5 hover:bg-slate-800 disabled:hover:translate-y-0"
+      : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50";
+  const triggerWidth = fullWidth ? "w-full" : "";
+
+  if (targets.length === 0) {
+    return (
+      <button
+        type="button"
+        disabled
+        className={`${triggerBase} ${triggerVariant} ${triggerWidth}`}
+      >
+        Final status{currentStatus ? `: ${currentStatus}` : ""}
+      </button>
+    );
+  }
+
+  return (
+    <div className={fullWidth ? "w-full" : "inline-block"}>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        disabled={isTransitioning}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={`${triggerBase} ${triggerVariant} ${triggerWidth}`}
+      >
+        {isTransitioning ? "Transitioning…" : "Change status"}
+        <FaArrowRight className="h-3 w-3 rotate-90" aria-hidden="true" />
+      </button>
+      {open &&
+        coords &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <>
+            <button
+              type="button"
+              aria-label="Close menu"
+              onClick={() => setOpen(false)}
+              className="fixed inset-0 z-40 cursor-default"
+            />
+            <div
+              role="menu"
+              style={{
+                position: "fixed",
+                top: coords.top,
+                left: coords.left,
+                width: coords.width,
+              }}
+              className="z-50 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg"
+            >
+              <p className="border-b border-slate-100 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                Move to
+              </p>
+              {targets.map((target) => (
+                <button
+                  key={target}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false);
+                    onPick(target);
+                  }}
+                  className="block w-full px-3 py-2 text-left text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  {target}
+                </button>
+              ))}
+            </div>
+          </>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
+function PolicyDetail({
+  policy: policyInput,
+  initialTab,
+  onBack,
+  onEdit,
+  onUploadVersion,
+}) {
+  // The adapter in PolicyManagement/index.jsx already builds the full
+  // detail shape from the API response. The legacy buildPolicyDetail()
+  // factory regenerates everything from mock templates and was overwriting
+  // real API data — drop it.
+  const policy = policyInput;
+  const dispatch = useDispatch();
+  const statusChangeStatus = useSelector(
+    (state) => state.policies.statusChangeStatus,
+  );
+  const statusChangeError = useSelector(
+    (state) => state.policies.statusChangeError,
+  );
+  const [activeTab, setActiveTab] = useState(initialTab ?? "overview");
+  const status = policy?.status ?? "Draft";
   const [uploaderOpen, setUploaderOpen] = useState(false);
+
+  function handleTransition(target) {
+    if (!target || !policy?.id) return;
+    const apiStatus = STATUS_UI_TO_API[target];
+    if (!apiStatus) return;
+    dispatch(
+      changeStatus({
+        policyId: policy.id,
+        payload: { status: apiStatus },
+      }),
+    );
+  }
 
   function openUploader() {
     setActiveTab("versions");
@@ -137,16 +314,26 @@ function PolicyDetail({ policy: policyInput, onBack, onEdit, onUploadVersion }) 
     );
   }
 
-  const nextStatus = transitionMap[status];
+  const allowedTargets = ALLOWED_TRANSITIONS[status] ?? [];
+  const isTransitioning = statusChangeStatus === "loading";
 
   return (
     <div className="grid min-w-0 gap-5 max-[900px]:gap-4">
+      {statusChangeStatus === "failed" && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          Status change failed:{" "}
+          {statusChangeError?.detail ??
+            statusChangeError?.message ??
+            "unknown error"}
+        </div>
+      )}
       <DetailHeader
         policy={policy}
         status={status}
         onBack={onBack}
-        nextStatus={nextStatus}
-        onTransition={() => nextStatus && setStatus(nextStatus)}
+        allowedTargets={allowedTargets}
+        isTransitioning={isTransitioning}
+        onTransition={handleTransition}
         onEdit={onEdit}
       />
 
@@ -191,9 +378,12 @@ function PolicyDetail({ policy: policyInput, onBack, onEdit, onUploadVersion }) 
             )}
             {activeTab === "acks" && <AcknowledgementsTab policy={policy} />}
             {activeTab === "checklist" && <ChecklistTab policy={policy} />}
-            {activeTab === "ai" && (
+            {/* AI tab is hidden — backend has no regenerate-insights endpoint
+                and the data (summary + key_clauses) is already shown in the
+                Overview tab. Re-enable the TABS entry above to bring it back. */}
+            {/* {activeTab === "ai" && (
               <AiTab policy={policy} onJumpToCitation={jumpToCitation} />
-            )}
+            )} */}
             {activeTab === "activity" && <ActivityTab policy={policy} />}
           </div>
         </section>
@@ -201,8 +391,9 @@ function PolicyDetail({ policy: policyInput, onBack, onEdit, onUploadVersion }) 
         <SidePanel
           policy={policy}
           status={status}
-          nextStatus={nextStatus}
-          onTransition={() => nextStatus && setStatus(nextStatus)}
+          allowedTargets={allowedTargets}
+          isTransitioning={isTransitioning}
+          onTransition={handleTransition}
           onUploadVersionClick={openUploader}
         />
       </div>
@@ -222,7 +413,8 @@ function DetailHeader({
   policy,
   status,
   onBack,
-  nextStatus,
+  allowedTargets,
+  isTransitioning,
   onTransition,
   onEdit,
 }) {
@@ -270,7 +462,9 @@ function DetailHeader({
                 )}
                 {status}
               </span>
-              <span className="text-[11px] text-slate-500">{policy.version}</span>
+              <span className="text-[11px] text-slate-500">
+                {policy.version}
+              </span>
             </div>
             <h1 className="mt-2 text-2xl font-semibold leading-tight text-slate-900 max-[520px]:text-xl">
               {policy.title}
@@ -292,16 +486,12 @@ function DetailHeader({
                 Edit policy
               </button>
             )}
-            {nextStatus && (
-              <button
-                type="button"
-                onClick={onTransition}
-                className="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800"
-              >
-                Transition to {nextStatus}
-                <FaArrowRight className="h-3 w-3" aria-hidden="true" />
-              </button>
-            )}
+            <StatusPicker
+              targets={allowedTargets}
+              isTransitioning={isTransitioning}
+              onPick={onTransition}
+              variant="primary"
+            />
           </div>
         </div>
       </div>
@@ -312,7 +502,8 @@ function DetailHeader({
 function SidePanel({
   policy,
   status,
-  nextStatus,
+  allowedTargets,
+  isTransitioning,
   onTransition,
   onUploadVersionClick,
 }) {
@@ -372,9 +563,7 @@ function SidePanel({
                   </dt>
                   <dd
                     className={`mt-0.5 text-xs font-medium ${
-                      item.tone === "danger"
-                        ? "text-red-700"
-                        : "text-slate-900"
+                      item.tone === "danger" ? "text-red-700" : "text-slate-900"
                     }`}
                   >
                     {item.value}
@@ -412,16 +601,16 @@ function SidePanel({
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={onTransition}
-          disabled={!nextStatus}
-          className="mt-5 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 disabled:shadow-none disabled:hover:translate-y-0"
-        >
-          {nextStatus
-            ? `Transition status → ${nextStatus}`
-            : `Final status: ${status}`}
-        </button>
+        <div className="mt-5">
+          <StatusPicker
+            targets={allowedTargets}
+            isTransitioning={isTransitioning}
+            onPick={onTransition}
+            variant="primary"
+            fullWidth
+            currentStatus={status}
+          />
+        </div>
 
         <button
           type="button"
@@ -503,8 +692,6 @@ function OverviewTab({ policy }) {
 }
 
 function PdfPreview({ policy }) {
-  const citations = policy.detail.aiInsights?.summary?.citations ?? [];
-
   return (
     <div className="rounded-2xl border border-slate-100 bg-white">
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
@@ -516,76 +703,93 @@ function PdfPreview({ policy }) {
           Uploaded {formatDate(policy.lastUpdated)}
         </span>
       </div>
-      <div className="max-h-[460px] overflow-y-auto bg-slate-50/40 px-6 py-5">
-        <article className="mx-auto grid max-w-2xl gap-4 rounded-xl bg-white px-6 py-6 text-xs leading-6 text-slate-700 shadow-sm ring-1 ring-slate-100">
-          <header className="border-b border-slate-100 pb-3">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-              {policy.code} · {policy.version}
-            </p>
-            <h3 className="mt-1 text-base font-semibold text-slate-900">
-              {policy.title}
-            </h3>
-            <p className="mt-1 text-[11px] text-slate-500">
-              Owner: {policy.owner} · Department: {policy.department}
-            </p>
-          </header>
-
-          <section>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-              Para 1.1 · Purpose
-            </p>
-            <p className="mt-1">{policy.detail.summary}</p>
-          </section>
-
-          <section>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-              Para 2 · Scope — applies to
-            </p>
-            <ul className="mt-1 grid gap-1 pl-4 list-disc marker:text-slate-300">
-              {policy.detail.appliesTo.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          </section>
-
-          <section>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-              Para 3 · Key clauses
-            </p>
-            <ol className="mt-1 grid gap-1 pl-4 list-decimal marker:text-slate-400">
-              {policy.detail.keyClauses.map((clause) => (
-                <li key={clause}>{clause}</li>
-              ))}
-            </ol>
-          </section>
-
-          {citations.map((citation) => (
-            <section
-              key={citation.id}
-              id={`citation-${citation.id}`}
-              className="scroll-mt-6 rounded-lg p-3 transition-all duration-300"
-            >
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-cyan-700">
-                {citation.label} · {citation.title}
-              </p>
-              <p className="mt-1">{citation.excerpt}</p>
-              <p className="mt-2 text-[10px] italic text-slate-400">
-                [ … remainder of section continues in document … ]
-              </p>
-            </section>
-          ))}
-        </article>
+      <div className="bg-slate-50/40">
+        {policy.fileLink ? (
+          <iframe
+            src={policy.fileLink}
+            title={`${policy.code} current PDF`}
+            className="h-[600px] w-full"
+          />
+        ) : (
+          <div className="grid h-[200px] place-items-center text-xs text-slate-500">
+            No file available for this policy.
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
+function basenameFromPath(path) {
+  if (!path) return null;
+  const parts = String(path).split(/[\\/]/);
+  return parts[parts.length - 1] || null;
+}
+
 function VersionsTab({ policy, onUploadClick }) {
+  const dispatch = useDispatch();
+  const {
+    versions: apiVersions,
+    versionsPolicyId,
+    versionsStatus,
+    versionsError,
+  } = useSelector((state) => state.policies);
+
+  useEffect(() => {
+    if (policy?.id != null) {
+      dispatch(fetchPolicyVersions(policy.id));
+    }
+  }, [dispatch, policy?.id]);
+
+  const showApi = versionsPolicyId === policy?.id;
+  const sortedApi = useMemo(() => {
+    if (!showApi) return [];
+    return [...apiVersions].sort((a, b) => {
+      const ta = new Date(a.created_at).getTime();
+      const tb = new Date(b.created_at).getTime();
+      if (tb !== ta) return tb - ta;
+      return (b.id ?? 0) - (a.id ?? 0);
+    });
+  }, [showApi, apiVersions]);
+
+  const rows = useMemo(() => {
+    const currentId = sortedApi[0]?.id;
+    return sortedApi.map((v) => ({
+      id: v.id,
+      version: v.version ? `v${v.version}` : "—",
+      isCurrent: v.id === currentId,
+      changeNote: v.change_note ?? `Version ${v.version} uploaded`,
+      uploadedBy: v.uploaded_by ?? "—",
+      uploadedAt: v.created_at,
+      fileName: basenameFromPath(v.file_path),
+      fileUrl: v.id === currentId ? policy.fileLink : null,
+    }));
+  }, [sortedApi, policy.fileLink]);
+
+  const isLoading = versionsStatus === "loading" && !showApi;
+  const hasFailed = versionsStatus === "failed";
+
+  if (isLoading) {
+    return (
+      <div className="px-4 py-12 text-center text-sm text-slate-500">
+        Loading versions…
+      </div>
+    );
+  }
+
+  if (hasFailed) {
+    return (
+      <div className="px-4 py-12 text-center text-sm text-red-700">
+        Failed to load versions: {versionsError?.message ?? "unknown error"}
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-3">
       <div className="flex items-center justify-between">
         <p className="text-[11px] text-slate-500">
-          {policy.detail.versions.length} versions on file
+          {rows.length} versions on file
         </p>
         <button
           type="button"
@@ -598,7 +802,7 @@ function VersionsTab({ policy, onUploadClick }) {
       </div>
 
       <ol className="grid gap-2">
-        {policy.detail.versions.map((version) => (
+        {rows.map((version) => (
           <li
             key={version.id}
             className={`grid gap-3 rounded-2xl border p-4 sm:grid-cols-[80px_minmax(0,1fr)_auto] sm:items-center ${
@@ -672,8 +876,13 @@ function VersionsTab({ policy, onUploadClick }) {
 }
 
 function AcknowledgementsTab({ policy }) {
-  const { overallPercent, targetPercent, deadline, totalRequired, byDepartment } =
-    policy.detail.acknowledgements;
+  const {
+    overallPercent,
+    targetPercent,
+    deadline,
+    totalRequired,
+    byDepartment,
+  } = policy.detail.acknowledgements;
   const overdue = isOverdue(deadline);
 
   return (
@@ -713,9 +922,7 @@ function AcknowledgementsTab({ policy }) {
         <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
           <div
             className={`h-full rounded-full ${
-              overallPercent >= targetPercent
-                ? "bg-emerald-500"
-                : "bg-cyan-500"
+              overallPercent >= targetPercent ? "bg-emerald-500" : "bg-cyan-500"
             }`}
             style={{ width: `${overallPercent}%` }}
           />
@@ -770,100 +977,96 @@ function AcknowledgementsTab({ policy }) {
   );
 }
 
-const ACCREDITATION_BODIES = ["JCI", "CBAHI", "DoH", "JAWDA"];
+// CBAHI / DoH / JAWDA are tracked in the backlog — backend has no audits
+// for them and the UI has no rendering yet. Keeping the constant as an
+// array so adding more bodies later is one line.
+const ACCREDITATION_BODIES = ["JCI"];
 
-function AiTab({ policy, onJumpToCitation }) {
-  const insights = policy.detail.aiInsights;
-
-  const initialSuggestions = useMemo(
-    () =>
-      insights.tagSuggestions.map((tag) => ({
-        ...tag,
-        state: "pending",
-      })),
-    [insights.tagSuggestions],
-  );
-  const initialConfirmed = useMemo(
-    () => insights.confirmedTags.map((tag) => ({ ...tag, state: "confirmed" })),
-    [insights.confirmedTags],
-  );
-
-  const [tagState, setTagState] = useState({
-    suggestions: initialSuggestions,
-    confirmed: initialConfirmed,
-  });
-
-  function handleConfirm(tagId) {
-    setTagState((current) => {
-      const tag = current.suggestions.find((t) => t.id === tagId);
-      if (!tag) return current;
-      return {
-        suggestions: current.suggestions.filter((t) => t.id !== tagId),
-        confirmed: [
-          ...current.confirmed,
-          { ...tag, state: "confirmed" },
-        ],
-      };
-    });
-  }
-
-  function handleReject(tagId) {
-    setTagState((current) => ({
-      ...current,
-      suggestions: current.suggestions.map((t) =>
-        t.id === tagId ? { ...t, state: "rejected" } : t,
-      ),
-    }));
-  }
-
-  function handleRestore(tagId) {
-    setTagState((current) => ({
-      ...current,
-      suggestions: current.suggestions.map((t) =>
-        t.id === tagId ? { ...t, state: "pending" } : t,
-      ),
-    }));
-  }
-
-  function handleAddManual({ code, label, rationale }) {
-    setTagState((current) => ({
-      ...current,
-      confirmed: [
-        ...current.confirmed,
-        {
-          id: `${policy.id}-manual-${current.confirmed.length + 1}`,
-          code,
-          label,
-          rationale,
-          confidence: null,
-          source: "manual",
-          state: "confirmed",
-        },
-      ],
-    }));
-  }
+/* AI tab is hidden — see backlog for full multi-standard rollout. The
+   summary + key_clauses are already rendered in the Overview tab, and there's
+   no backend endpoint to regenerate insights on demand, so the dedicated tab
+   adds little. The orphan components (AiSummaryPanel, JciTagPickerPanel,
+   ConfidencePill, TagSuggestionRow, ConfirmedTagRow) belong to the original
+   mock-driven design and are kept here for reference only.
+function AiTab({ policy }) {
+  const summary = policy.detail.summary;
+  const keyClauses = policy.detail.keyClauses ?? [];
+  const isSummaryPlaceholder =
+    !summary || summary === "Summary not available yet.";
 
   return (
     <div className="grid gap-4">
       <AiHeader />
-      <AiSummaryPanel
-        summary={insights.summary}
-        onJumpToCitation={onJumpToCitation}
-      />
-      <JciTagPickerPanel
-        suggestions={tagState.suggestions}
-        confirmed={tagState.confirmed}
-        onConfirm={handleConfirm}
-        onReject={handleReject}
-        onRestore={handleRestore}
-        onAddManual={handleAddManual}
-      />
+      <AiSummarySection summary={summary} placeholder={isSummaryPlaceholder} />
+      <KeyClausesSection clauses={keyClauses} />
       <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-[11px] leading-5 text-slate-600">
-        Looking for the gap-by-body crosswalk? It moved to the{" "}
-        <span className="font-semibold text-slate-800">Checklist</span> tab,
-        where you can also print or download a PDF.
+        For the JCI requirement crosswalk (covered vs gaps with remediation
+        suggestions), see the{" "}
+        <span className="font-semibold text-slate-800">Checklist</span> tab.
       </p>
     </div>
+  );
+}
+
+function AiSummarySection({ summary, placeholder }) {
+  return (
+    <section className="rounded-2xl border border-slate-100 bg-white">
+      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
+        <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-cyan-700">
+          <FaWandMagicSparkles className="h-3 w-3" aria-hidden="true" />
+          AI summary
+        </p>
+        <span className="text-[10px] text-slate-500">
+          Generated by the upload pipeline
+        </span>
+      </div>
+      <div className="p-4">
+        {placeholder ? (
+          <p className="text-xs italic text-slate-500">
+            Summary is still being generated. The background pipeline runs
+            shortly after upload — refresh the page in a few seconds.
+          </p>
+        ) : (
+          <p className="whitespace-pre-wrap text-xs leading-6 text-slate-700">
+            {summary}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function KeyClausesSection({ clauses }) {
+  return (
+    <section className="rounded-2xl border border-slate-100 bg-white">
+      <div className="border-b border-slate-100 px-4 py-2.5">
+        <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-cyan-700">
+          <FaWandMagicSparkles className="h-3 w-3" aria-hidden="true" />
+          Key clauses
+        </p>
+      </div>
+      <div className="p-4">
+        {clauses.length === 0 ? (
+          <p className="text-xs italic text-slate-500">
+            No key clauses extracted yet.
+          </p>
+        ) : (
+          <ol className="grid gap-2">
+            {clauses.map((clause, idx) => (
+              <li
+                key={idx}
+                className="flex items-start gap-2 text-xs leading-6 text-slate-700"
+              >
+                <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-cyan-100 text-[10px] font-semibold text-cyan-700">
+                  {idx + 1}
+                </span>
+                <span>{clause}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -877,18 +1080,10 @@ function AiHeader() {
         <div>
           <p className="text-xs font-semibold text-slate-900">AI insights</p>
           <p className="text-[11px] text-slate-500">
-            Generated from the current version of the policy. Demo mode — values
-            shown are illustrative.
+            Generated by the background pipeline when this version was uploaded.
           </p>
         </div>
       </div>
-      <button
-        type="button"
-        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-cyan-200 bg-white px-3 text-xs font-semibold text-cyan-700 hover:bg-cyan-50"
-      >
-        <FaRobot className="h-3 w-3" aria-hidden="true" />
-        Re-run
-      </button>
     </div>
   );
 }
@@ -1292,35 +1487,218 @@ function ConfirmedTagRow({ tag }) {
     </li>
   );
 }
+*/
+
+const ACTIVITY_TYPE_STYLES = {
+  uploaded: {
+    dot: "bg-cyan-500",
+    label: "Uploaded",
+    chip: "bg-cyan-50 text-cyan-700 ring-cyan-200",
+  },
+  version_uploaded: {
+    dot: "bg-cyan-500",
+    label: "New version",
+    chip: "bg-cyan-50 text-cyan-700 ring-cyan-200",
+  },
+  metadata_updated: {
+    dot: "bg-slate-400",
+    label: "Metadata",
+    chip: "bg-slate-100 text-slate-700 ring-slate-200",
+  },
+  status_changed: {
+    dot: "bg-amber-500",
+    label: "Status",
+    chip: "bg-amber-50 text-amber-700 ring-amber-200",
+  },
+  audited: {
+    dot: "bg-emerald-500",
+    label: "Audit",
+    chip: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  },
+  deleted: {
+    dot: "bg-red-500",
+    label: "Deleted",
+    chip: "bg-red-50 text-red-700 ring-red-200",
+  },
+  restored: {
+    dot: "bg-emerald-500",
+    label: "Restored",
+    chip: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  },
+};
 
 function ActivityTab({ policy }) {
+  const activity = policy.detail.activity ?? [];
+
+  if (activity.length === 0) {
+    return (
+      <div className="grid place-items-center gap-2 px-4 py-12 text-center text-sm text-slate-500">
+        <p>No activity recorded for this policy yet.</p>
+      </div>
+    );
+  }
+
   return (
-    <ol className="relative grid gap-4 pl-5">
+    <ol className="relative grid gap-5 pl-5">
       <span
         aria-hidden="true"
         className="absolute left-1.5 top-2 bottom-2 w-px bg-slate-200"
       />
-      {policy.detail.activity.map((entry) => (
-        <li key={entry.id} className="relative">
-          <span
-            aria-hidden="true"
-            className="absolute -left-[18px] top-1 h-2.5 w-2.5 rounded-full bg-cyan-500 ring-2 ring-white"
-          />
-          <p className="text-xs font-medium text-slate-900">{entry.action}</p>
-          <p className="mt-0.5 text-[11px] text-slate-500">
-            {formatDateTime(entry.at)}
-          </p>
-        </li>
-      ))}
+      {activity.map((entry) => {
+        const styles = ACTIVITY_TYPE_STYLES[entry.eventType] ?? {
+          dot: "bg-slate-400",
+          label: entry.eventType ?? "Event",
+          chip: "bg-slate-100 text-slate-700 ring-slate-200",
+        };
+        return (
+          <li key={entry.id} className="relative">
+            <span
+              aria-hidden="true"
+              className={`absolute -left-[18px] top-1 h-2.5 w-2.5 rounded-full ring-2 ring-white ${styles.dot}`}
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${styles.chip}`}
+              >
+                {styles.label}
+              </span>
+              <p className="text-xs font-medium text-slate-900">
+                {entry.action}
+              </p>
+            </div>
+            <p className="mt-1 text-[11px] text-slate-500">
+              {formatDateTime(entry.at)}
+              {entry.actor && (
+                <>
+                  {" · "}
+                  <span className="font-medium text-slate-600">
+                    {entry.actor}
+                  </span>
+                </>
+              )}
+            </p>
+          </li>
+        );
+      })}
     </ol>
   );
 }
 
+function adaptAuditToGapAnalysis(api) {
+  const jci = api?.JCI ?? { covered: [], gaps: [] };
+  return {
+    JCI: {
+      covered: (jci.covered ?? []).map((c) => ({
+        code: c.code,
+        label: c.label,
+        text: c.text,
+        citation: c.citation ?? null,
+      })),
+      gaps: (jci.gaps ?? []).map((g) => ({
+        code: g.code,
+        label: g.label,
+        text: g.text,
+        severity: g.severity,
+        remediation: g.remediation,
+        recommendedTemplate: g.recommended_template ?? null,
+      })),
+    },
+  };
+}
+
 function ChecklistTab({ policy }) {
-  const gapAnalysis = policy.detail.aiInsights.gapAnalysis;
-  const generatedAt = useMemo(() => new Date(), []);
+  const dispatch = useDispatch();
+  const { audit, auditPolicyId, auditStatus, auditError } = useSelector(
+    (state) => state.policies,
+  );
+
+  const isMatchingAudit = auditPolicyId === policy?.id && audit != null;
+
+  useEffect(() => {
+    if (policy?.id != null) dispatch(fetchAudit(policy.id));
+  }, [dispatch, policy?.id]);
+
+  // Poll while the background pipeline is still cooking. Cleared on unmount,
+  // status change, or when the user navigates to a different policy.
+  useEffect(() => {
+    if (auditStatus !== "pending" || policy?.id == null) return undefined;
+    const intervalId = setInterval(() => {
+      dispatch(fetchAudit(policy.id));
+    }, 5000);
+    return () => clearInterval(intervalId);
+  }, [dispatch, auditStatus, policy?.id]);
+
+  const gapAnalysis = useMemo(
+    () => (isMatchingAudit ? adaptAuditToGapAnalysis(audit) : null),
+    [isMatchingAudit, audit],
+  );
+
+  const handleRerun = () => {
+    if (policy?.id != null) dispatch(runAudit(policy.id));
+  };
+
+  if (!isMatchingAudit) {
+    if (auditStatus === "pending") {
+      return (
+        <div className="grid place-items-center gap-2 px-4 py-12 text-center">
+          <p className="text-sm font-medium text-slate-700">
+            Audit is being generated…
+          </p>
+          <p className="text-xs text-slate-500">
+            The background pipeline (chunking, embedding, scoring) usually takes
+            30–60 seconds. We'll refresh automatically.
+          </p>
+        </div>
+      );
+    }
+    if (auditStatus === "failed") {
+      return (
+        <div className="grid place-items-center gap-3 px-4 py-12 text-center">
+          <p className="text-sm text-red-700">
+            Failed to load audit: {auditError?.message ?? "unknown error"}
+          </p>
+          <button
+            type="button"
+            onClick={() => dispatch(fetchAudit(policy.id))}
+            className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
+    return (
+      <div className="px-4 py-12 text-center text-sm text-slate-500">
+        Loading audit…
+      </div>
+    );
+  }
+
+  const generatedAt = audit?.generated_at
+    ? new Date(audit.generated_at)
+    : new Date();
+
+  return (
+    <ChecklistTabBody
+      policy={policy}
+      gapAnalysis={gapAnalysis}
+      generatedAt={generatedAt}
+      auditStatus={auditStatus}
+      onRerun={handleRerun}
+    />
+  );
+}
+
+function ChecklistTabBody({
+  policy,
+  gapAnalysis,
+  generatedAt,
+  auditStatus,
+  onRerun,
+}) {
   const [bodyFilter, setBodyFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [detailItem, setDetailItem] = useState(null);
 
   const allBodySummaries = ACCREDITATION_BODIES.map((body) => {
     const data = gapAnalysis[body] ?? { covered: [], gaps: [] };
@@ -1382,10 +1760,7 @@ function ChecklistTab({ policy }) {
   }
 
   return (
-    <div
-      id="accreditation-checklist-print-root"
-      className="grid gap-4"
-    >
+    <div id="accreditation-checklist-print-root" className="grid gap-4">
       <header className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-cyan-200 bg-gradient-to-br from-cyan-50/60 to-white px-4 py-3 print:border-slate-300 print:bg-white">
         <div className="flex items-start gap-2.5">
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-cyan-600 text-white print:hidden">
@@ -1403,12 +1778,19 @@ function ChecklistTab({ policy }) {
               {policy.department}
             </p>
             <p className="text-[11px] text-slate-500">
-              Owner: {policy.owner} · Generated{" "}
-              {formatDateTime(generatedAt)}
+              Owner: {policy.owner} · Generated {formatDateTime(generatedAt)}
             </p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 print:hidden">
+          <button
+            type="button"
+            onClick={onRerun}
+            disabled={auditStatus === "loading"}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {auditStatus === "loading" ? "Re-running…" : "Re-run audit"}
+          </button>
           <button
             type="button"
             onClick={handlePrint}
@@ -1447,21 +1829,23 @@ function ChecklistTab({ policy }) {
         <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
           Filter
         </span>
-        <label className="inline-flex items-center gap-1.5 text-[11px] text-slate-500">
-          <span>Body</span>
-          <select
-            value={bodyFilter}
-            onChange={(e) => setBodyFilter(e.target.value)}
-            className="h-7 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-700 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
-          >
-            <option value="ALL">All bodies</option>
-            {ACCREDITATION_BODIES.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
-        </label>
+        {ACCREDITATION_BODIES.length > 1 && (
+          <label className="inline-flex items-center gap-1.5 text-[11px] text-slate-500">
+            <span>Body</span>
+            <select
+              value={bodyFilter}
+              onChange={(e) => setBodyFilter(e.target.value)}
+              className="h-7 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-700 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
+            >
+              <option value="ALL">All bodies</option>
+              {ACCREDITATION_BODIES.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="inline-flex items-center gap-1.5 text-[11px] text-slate-500">
           <span>Status</span>
           <select
@@ -1488,6 +1872,7 @@ function ChecklistTab({ policy }) {
             data={data}
             total={total}
             coveragePct={coveragePct}
+            onViewFull={setDetailItem}
           />
         ))}
         {filteredSummaries.every(
@@ -1498,12 +1883,6 @@ function ChecklistTab({ policy }) {
           </p>
         )}
       </div>
-
-      <footer className="border-t border-slate-200 pt-3 text-[10px] leading-5 text-slate-500">
-        Demo mode — values are illustrative. Coverage and gap detection are
-        simulated from the policy text. Verify against the published
-        accreditation manuals before formal submission.
-      </footer>
 
       <style>{`
         @media print {
@@ -1519,6 +1898,13 @@ function ChecklistTab({ policy }) {
           }
         }
       `}</style>
+
+      {detailItem && (
+        <RequirementDetailModal
+          item={detailItem}
+          onClose={() => setDetailItem(null)}
+        />
+      )}
     </div>
   );
 }
@@ -1531,9 +1917,7 @@ function SummaryStat({ label, value, tone }) {
     amber: "border-amber-200 bg-amber-50 text-amber-700",
   };
   return (
-    <div
-      className={`rounded-lg border p-3 ${tones[tone] ?? tones.slate}`}
-    >
+    <div className={`rounded-lg border p-3 ${tones[tone] ?? tones.slate}`}>
       <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">
         {label}
       </p>
@@ -1542,7 +1926,7 @@ function SummaryStat({ label, value, tone }) {
   );
 }
 
-function BodyChecklistSection({ body, data, total, coveragePct }) {
+function BodyChecklistSection({ body, data, total, coveragePct, onViewFull }) {
   return (
     <section className="break-inside-avoid rounded-xl border border-slate-200 print:border-slate-300">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2 print:bg-white">
@@ -1575,6 +1959,7 @@ function BodyChecklistSection({ body, data, total, coveragePct }) {
               meta={el.citation && `Citation: ${el.citation.label}`}
               metaText={el.citation?.excerpt}
               status="covered"
+              onViewFull={() => onViewFull({ kind: "covered", el })}
             />
           ))}
           {data.gaps.map((el) => (
@@ -1589,11 +1974,139 @@ function BodyChecklistSection({ body, data, total, coveragePct }) {
               status="gap"
               severity={el.severity}
               recommendedTemplate={el.recommendedTemplate}
+              onViewFull={() => onViewFull({ kind: "gap", el })}
             />
           ))}
         </ul>
       )}
     </section>
+  );
+}
+
+function RequirementDetailModal({ item, onClose }) {
+  const { kind, el } = item;
+  const isCovered = kind === "covered";
+
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 p-4 print:hidden"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="grid w-full max-w-2xl gap-4 overflow-hidden rounded-2xl bg-white shadow-2xl"
+      >
+        <header
+          className={`flex items-start justify-between gap-3 px-5 py-3 ${
+            isCovered ? "bg-emerald-50" : "bg-red-50"
+          }`}
+        >
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded-md px-2 py-0.5 text-[11px] font-semibold text-white ${
+                  isCovered ? "bg-emerald-600" : "bg-red-600"
+                }`}
+              >
+                {el.code}
+              </span>
+              <span
+                className={`text-[10px] font-semibold uppercase tracking-wide ${
+                  isCovered ? "text-emerald-700" : "text-red-700"
+                }`}
+              >
+                {isCovered ? "Covered" : "Gap"}
+              </span>
+              {!isCovered && el.severity && (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${
+                    el.severity === "Critical"
+                      ? "bg-red-100 text-red-700 ring-red-200"
+                      : "bg-amber-50 text-amber-700 ring-amber-200"
+                  }`}
+                >
+                  {el.severity}
+                </span>
+              )}
+            </div>
+            <h3 className="mt-2 text-sm font-semibold leading-snug text-slate-900">
+              {el.label}
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-slate-500 hover:bg-white/60 hover:text-slate-700"
+          >
+            ×
+          </button>
+        </header>
+
+        <div className="grid gap-4 px-5 pb-5 max-h-[70vh] overflow-y-auto">
+          <section>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Requirement text
+            </p>
+            <p className="mt-1 whitespace-pre-wrap text-xs leading-6 text-slate-700">
+              {el.text || "—"}
+            </p>
+          </section>
+
+          {isCovered && el.citation && (
+            <section>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                Citation · {el.citation.label ?? "—"}
+              </p>
+              <blockquote className="mt-1 rounded-lg border-l-4 border-emerald-300 bg-emerald-50/50 px-3 py-2 text-xs leading-6 text-slate-700">
+                {el.citation.excerpt || "—"}
+              </blockquote>
+            </section>
+          )}
+
+          {!isCovered && (
+            <>
+              <section>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-red-700">
+                  Suggested remediation
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-xs leading-6 text-slate-700">
+                  {el.remediation || "—"}
+                </p>
+              </section>
+              {el.recommendedTemplate && (
+                <section>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-cyan-700">
+                    Recommended template
+                  </p>
+                  <p className="mt-1 text-xs text-slate-700">
+                    <span className="font-semibold">
+                      {el.recommendedTemplate.code}
+                    </span>{" "}
+                    — {el.recommendedTemplate.title}
+                  </p>
+                  {el.recommendedTemplate.filename && (
+                    <p className="mt-0.5 text-[11px] text-slate-500">
+                      {el.recommendedTemplate.filename}
+                    </p>
+                  )}
+                </section>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1607,6 +2120,7 @@ function ChecklistRow({
   status,
   severity,
   recommendedTemplate,
+  onViewFull,
 }) {
   return (
     <li className="flex gap-3 px-4 py-3">
@@ -1643,6 +2157,15 @@ function ChecklistRow({
               {severity}
             </span>
           )}
+          {onViewFull && (
+            <button
+              type="button"
+              onClick={onViewFull}
+              className="ml-auto inline-flex h-6 items-center rounded-md border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-700 hover:bg-slate-50 print:hidden"
+            >
+              View full
+            </button>
+          )}
         </div>
         <p className="mt-1 text-[11px] leading-5 text-slate-600">{text}</p>
         {meta && (
@@ -1672,7 +2195,12 @@ function ChecklistRow({
   );
 }
 
-function TemplateRecommendation({ template, elementCode, elementLabel, elementText }) {
+function TemplateRecommendation({
+  template,
+  elementCode,
+  elementLabel,
+  elementText,
+}) {
   const [feedback, setFeedback] = useState(null);
 
   function downloadBlob(filename, body) {
@@ -1699,7 +2227,11 @@ function TemplateRecommendation({ template, elementCode, elementLabel, elementTe
     const filename = template.filename.replace(/\.docx$/, "_AI-filled.docx");
     downloadBlob(
       filename,
-      buildAiFilledTemplate(template, { elementCode, elementLabel, elementText }),
+      buildAiFilledTemplate(template, {
+        elementCode,
+        elementLabel,
+        elementText,
+      }),
     );
     setFeedback(`AI-filled ${template.code} drafted and downloaded.`);
     setTimeout(() => setFeedback(null), 3500);
@@ -1744,7 +2276,9 @@ function TemplateRecommendation({ template, elementCode, elementLabel, elementTe
         </div>
       </div>
       {feedback && (
-        <p className="mt-1.5 text-[10px] font-medium text-emerald-700">{feedback}</p>
+        <p className="mt-1.5 text-[10px] font-medium text-emerald-700">
+          {feedback}
+        </p>
       )}
     </div>
   );
@@ -1846,7 +2380,13 @@ function buildAiFilledTemplate(template, element) {
   ].join("\n");
 }
 
-function buildChecklistPdf(policy, bodySummaries, totals, overallPct, generatedAt) {
+function buildChecklistPdf(
+  policy,
+  bodySummaries,
+  totals,
+  overallPct,
+  generatedAt,
+) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -1911,14 +2451,24 @@ function buildChecklistPdf(policy, bodySummaries, totals, overallPct, generatedA
 
   // Summary stats
   const statBoxes = [
-    { label: "Total elements", value: String(totals.total), bg: [241, 245, 249], fg: [51, 65, 85] },
+    {
+      label: "Total elements",
+      value: String(totals.total),
+      bg: [241, 245, 249],
+      fg: [51, 65, 85],
+    },
     {
       label: "Covered",
       value: `${totals.covered} (${overallPct}%)`,
       bg: [236, 253, 245],
       fg: [6, 95, 70],
     },
-    { label: "Gaps", value: String(totals.gaps), bg: [254, 242, 242], fg: [153, 27, 27] },
+    {
+      label: "Gaps",
+      value: String(totals.gaps),
+      bg: [254, 242, 242],
+      fg: [153, 27, 27],
+    },
     {
       label: "Critical gaps",
       value: String(totals.critical),
@@ -2053,11 +2603,19 @@ function buildChecklistPdf(policy, bodySummaries, totals, overallPct, generatedA
           it.severity === "Critical"
             ? { fill: [254, 226, 226], text: [153, 27, 27] }
             : { fill: [253, 230, 138], text: [146, 64, 14] };
-        doc.setFillColor(sevColors.fill[0], sevColors.fill[1], sevColors.fill[2]);
+        doc.setFillColor(
+          sevColors.fill[0],
+          sevColors.fill[1],
+          sevColors.fill[2],
+        );
         doc.roundedRect(sevX, y, severityW, 12, 6, 6, "F");
         doc.setFontSize(8);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(sevColors.text[0], sevColors.text[1], sevColors.text[2]);
+        doc.setTextColor(
+          sevColors.text[0],
+          sevColors.text[1],
+          sevColors.text[2],
+        );
         doc.text(severityText, sevX + 5, y + 8.5);
       }
       y += 16;
@@ -2102,10 +2660,6 @@ function buildChecklistPdf(policy, bodySummaries, totals, overallPct, generatedA
   // Footer
   ensureSpace(30);
   drawDivider();
-  drawTextBlock(
-    "Demo mode — values are illustrative. Coverage and gap detection are simulated from the policy text. Verify against the published accreditation manuals before formal submission.",
-    { size: 8, color: [100, 116, 139] },
-  );
 
   // Page numbers
   const pageCount = doc.internal.getNumberOfPages();

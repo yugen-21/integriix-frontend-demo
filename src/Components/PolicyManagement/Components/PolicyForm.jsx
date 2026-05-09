@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDispatch } from "react-redux";
 import {
   FaCheck,
   FaCircleExclamation,
@@ -11,11 +12,11 @@ import {
   FaUsers,
   FaXmark,
 } from "react-icons/fa6";
+import { audienceRules, policyCategories, policyOwners } from "../../../data";
 import {
-  audienceRules,
-  policyCategories,
-  policyOwners,
-} from "../../../data";
+  cancelStagedPolicyUpload,
+  stagePolicyUpload,
+} from "../../../store/policiesSlice";
 
 const DUMMY_TITLES = [
   "Hand Hygiene Compliance",
@@ -64,7 +65,10 @@ function generateDummyFields(existingCodes) {
   };
 }
 
-const CODE_PATTERN = /^[A-Z]{2,4}\s\d{2,4}$/;
+// Accept the original "HR 3001" mock format and also real-world hospital
+// codes like "PEP-12", "MMU-009", "IPSG-3", "MMU.05.00". Loose on the
+// frontend; the backend only requires uniqueness, not a specific shape.
+const CODE_PATTERN = /^[A-Z][A-Z0-9.\-\s]{1,29}$/;
 const TITLE_MIN = 3;
 
 function todayIso() {
@@ -97,6 +101,7 @@ function inferAudienceFromPolicy(policy) {
 
 function PolicyForm({ mode, policy, existingCodes, onClose, onSave }) {
   const isEdit = mode === "edit";
+  const dispatch = useDispatch();
   const [draft, setDraft] = useState(() =>
     isEdit && policy
       ? {
@@ -104,15 +109,33 @@ function PolicyForm({ mode, policy, existingCodes, onClose, onSave }) {
           title: policy.title ?? "",
           category: policy.category ?? policyCategories[0],
           owner: policy.owner ?? "",
-          audienceRule:
-            policy.audienceRule ?? inferAudienceFromPolicy(policy),
+          audienceRule: policy.audienceRule ?? inferAudienceFromPolicy(policy),
           nextReview: policy.nextReview ?? "",
         }
       : emptyDraft(),
   );
   const [touched, setTouched] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
   const firstFieldRef = useRef(null);
+
+  // Track the temp_file_id returned from POST /policies/upload so we can:
+  //   (a) include it in the confirm payload on submit
+  //   (b) cancel the staged upload if the user closes the form without saving
+  // committedRef flips true once the confirm succeeds, so unmount cleanup
+  // skips the cancel call.
+  const [tempFileId, setTempFileId] = useState(null);
+  const tempFileIdRef = useRef(null);
+  const committedRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (tempFileIdRef.current && !committedRef.current) {
+        dispatch(cancelStagedPolicyUpload(tempFileIdRef.current));
+      }
+    };
+  }, [dispatch]);
 
   const [extractor, setExtractor] = useState({
     status: "idle",
@@ -141,7 +164,8 @@ function PolicyForm({ mode, policy, existingCodes, onClose, onSave }) {
     if (!trimmedCode) {
       e.code = "Code is required.";
     } else if (!CODE_PATTERN.test(trimmedCode)) {
-      e.code = "Use the format \"HR 3001\" — letters, a space, then digits.";
+      e.code =
+        'Use letters and digits (e.g. "PEP-12", "MMU-009", "HR 3001").';
     } else if (existingCodes.includes(trimmedCode)) {
       e.code = "This code is already in use.";
     }
@@ -155,9 +179,7 @@ function PolicyForm({ mode, policy, existingCodes, onClose, onSave }) {
     if (!draft.category) e.category = "Pick a category.";
 
     if (!draft.owner.trim()) {
-      e.owner = "Pick an owner from the list.";
-    } else if (!ownerByName(draft.owner.trim())) {
-      e.owner = "Pick an owner from the list.";
+      e.owner = "Owner is required.";
     }
 
     if (!draft.audienceRule) e.audienceRule = "Pick an audience rule.";
@@ -166,8 +188,6 @@ function PolicyForm({ mode, policy, existingCodes, onClose, onSave }) {
       e.nextReview = "Next review date is required.";
     } else if (Number.isNaN(new Date(draft.nextReview).getTime())) {
       e.nextReview = "Use a valid date.";
-    } else if (draft.nextReview < todayIso()) {
-      e.nextReview = "Next review date must be in the future.";
     }
     return e;
   }, [draft, existingCodes]);
@@ -187,58 +207,114 @@ function PolicyForm({ mode, policy, existingCodes, onClose, onSave }) {
   }
 
   const handleFile = useCallback(
-    (file) => {
+    async (file) => {
       if (!file) return;
+
+      // If the user is replacing a previously-staged file, cancel the old
+      // staging first so we don't leak a temp file.
+      if (tempFileIdRef.current && !committedRef.current) {
+        dispatch(cancelStagedPolicyUpload(tempFileIdRef.current));
+        tempFileIdRef.current = null;
+        setTempFileId(null);
+      }
 
       setExtractor({
         status: "working",
         fileName: file.name,
         progress: 0.3,
-        message: "Reading file…",
+        message: "Reading file & extracting metadata…",
         extractedFields: null,
         error: null,
       });
 
-      window.setTimeout(() => {
-        const fields = generateDummyFields(existingCodes);
-        setDraft((prev) => ({ ...prev, ...fields }));
-        setTouched((prev) => ({
-          ...prev,
-          code: true,
-          title: true,
-          category: true,
-          owner: true,
-          audienceRule: true,
-          nextReview: true,
-        }));
+      try {
+        const result = await dispatch(stagePolicyUpload(file)).unwrap();
+        tempFileIdRef.current = result.temp_file_id;
+        setTempFileId(result.temp_file_id);
+
+        // Pre-fill from extracted metadata. Only overwrite fields the API
+        // actually returned (any may be null if the LLM couldn't find them).
+        const fields = {};
+        if (result.code) fields.code = result.code;
+        if (result.title) fields.title = result.title;
+        if (result.category) fields.category = result.category;
+        if (result.next_review_date) {
+          fields.nextReview = String(result.next_review_date).slice(0, 10);
+        }
+
+        if (Object.keys(fields).length > 0) {
+          setDraft((prev) => ({ ...prev, ...fields }));
+          setTouched((prev) => ({
+            ...prev,
+            ...Object.fromEntries(Object.keys(fields).map((k) => [k, true])),
+          }));
+        }
+
         setExtractor({
           status: "done",
           fileName: file.name,
           progress: 1,
-          message: "Auto-filled with sample values — edit anything before saving.",
+          message: `Auto-filled from ${result.page_count} page${
+            result.page_count === 1 ? "" : "s"
+          } (${result.extraction_method}). Review and save.`,
           extractedFields: fields,
           error: null,
         });
-      }, 700);
+      } catch (err) {
+        setExtractor({
+          status: "error",
+          fileName: file.name,
+          progress: 0,
+          message: "",
+          extractedFields: null,
+          error:
+            err?.detail ?? err?.message ?? "Could not read the file.",
+        });
+      }
     },
-    [existingCodes],
+    [dispatch],
   );
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     setSubmitted(true);
+    setSaveError(null);
     if (!isValid) return;
 
-    const owner = ownerByName(draft.owner.trim());
-    onSave?.({
+    if (!isEdit && !tempFileId) {
+      setSaveError(
+        "Drop a PDF first — we need to stage the upload before creating.",
+      );
+      return;
+    }
+
+    const ownerName = draft.owner.trim();
+    const matchedOwner = ownerByName(ownerName);
+    const values = {
       code: draft.code.trim().toUpperCase(),
       title: draft.title.trim(),
       category: draft.category,
-      owner: owner?.name ?? draft.owner.trim(),
-      department: owner?.role ?? policy?.department ?? "General",
+      owner: ownerName,
+      // Department is derived from a directory match if available; otherwise
+      // keep the policy's existing department (edit) or default (create).
+      department: matchedOwner?.role ?? policy?.department ?? "General",
       audienceRule: draft.audienceRule,
       nextReview: draft.nextReview,
-    });
+    };
+    if (!isEdit) values.tempFileId = tempFileId;
+
+    setSaving(true);
+    try {
+      await onSave?.(values);
+      // Confirm succeeded; don't cancel the staged upload on unmount.
+      committedRef.current = true;
+    } catch (err) {
+      setSaveError(
+        err?.detail ?? err?.message ?? "Save failed. Try again.",
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -264,10 +340,13 @@ function PolicyForm({ mode, policy, existingCodes, onClose, onSave }) {
               id="policy-form-title"
               className="mt-1 text-lg font-semibold leading-tight text-slate-900"
             >
-              {isEdit ? `Update ${policy?.code ?? "policy"}` : "Register a new policy"}
+              {isEdit
+                ? `Update ${policy?.code ?? "policy"}`
+                : "Register a new policy"}
             </h2>
             <p className="mt-1 text-xs text-slate-500">
-              Fields marked with <span className="text-red-600">*</span> are required.
+              Fields marked with <span className="text-red-600">*</span> are
+              required.
             </p>
           </div>
           <button
@@ -301,7 +380,7 @@ function PolicyForm({ mode, policy, existingCodes, onClose, onSave }) {
           <Field
             label="Code"
             htmlFor="policy-code"
-            hint="Format: HR 3001"
+            hint="e.g. PEP-12, MMU-009, HR 3001"
             error={showError("code") ? errors.code : null}
           >
             <input
@@ -358,7 +437,7 @@ function PolicyForm({ mode, policy, existingCodes, onClose, onSave }) {
             label="Owner"
             htmlFor="policy-owner"
             className="sm:col-span-2"
-            hint="Search the directory and pick a person or committee."
+            hint="Pick from the directory or type a name / committee of your own."
             error={showError("owner") ? errors.owner : null}
           >
             <OwnerPicker
@@ -395,7 +474,6 @@ function PolicyForm({ mode, policy, existingCodes, onClose, onSave }) {
               id="policy-next-review"
               type="date"
               value={draft.nextReview}
-              min={todayIso()}
               onChange={(e) => update("nextReview", e.target.value)}
               onBlur={() => markTouched("nextReview")}
               className={inputClass(showError("nextReview"))}
@@ -413,21 +491,41 @@ function PolicyForm({ mode, policy, existingCodes, onClose, onSave }) {
           </p>
         )}
 
+        {saveError && (
+          <p
+            className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700 ring-1 ring-red-200"
+            role="alert"
+          >
+            <FaCircleExclamation className="h-3 w-3" aria-hidden="true" />
+            {saveError}
+          </p>
+        )}
+
         <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-4">
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+            disabled={saving}
+            className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             Cancel
           </button>
           <button
             type="submit"
             className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-slate-900 px-4 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
-            disabled={submitted && !isValid}
+            disabled={(submitted && !isValid) || saving}
           >
-            <FaCheck className="h-3 w-3" aria-hidden="true" />
-            {isEdit ? "Save changes" : "Create policy"}
+            {saving ? (
+              <>
+                <FaSpinner className="h-3 w-3 animate-spin" aria-hidden="true" />
+                {isEdit ? "Saving…" : "Creating…"}
+              </>
+            ) : (
+              <>
+                <FaCheck className="h-3 w-3" aria-hidden="true" />
+                {isEdit ? "Save changes" : "Create policy"}
+              </>
+            )}
           </button>
         </footer>
       </form>
@@ -570,7 +668,9 @@ function AudiencePicker({ value, onChange }) {
           >
             <span
               className={`mt-0.5 grid h-5 w-5 place-items-center rounded-md ${
-                selected ? "bg-cyan-600 text-white" : "bg-slate-100 text-slate-500"
+                selected
+                  ? "bg-cyan-600 text-white"
+                  : "bg-slate-100 text-slate-500"
               }`}
             >
               <FaUsers className="h-2.5 w-2.5" aria-hidden="true" />
@@ -641,7 +741,7 @@ function PdfDropzone({ extractor, onFile, onReset }) {
           </p>
           <p className="mt-0.5 text-[11px] opacity-80">
             {success
-              ? extractor.message ?? "Review and tweak before saving."
+              ? (extractor.message ?? "Review and tweak before saving.")
               : extractor.error}
           </p>
         </div>
@@ -710,9 +810,7 @@ function PdfDropzone({ extractor, onFile, onReset }) {
           <p className="text-xs font-semibold text-slate-800">
             Drop a file to auto-fill the form
           </p>
-          <p className="text-[11px] text-slate-500">
-            Demo mode — any file populates the fields with sample values you can edit.
-          </p>
+
           <div className="mt-1 flex items-center justify-center gap-2">
             <button
               type="button"

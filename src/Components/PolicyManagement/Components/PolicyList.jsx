@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   FaCircleCheck,
   FaCircleExclamation,
@@ -23,6 +24,7 @@ const statusStyles = {
 };
 
 function formatDate(value) {
+  if (!value) return "—";
   return new Intl.DateTimeFormat("en", {
     year: "numeric",
     month: "short",
@@ -31,16 +33,18 @@ function formatDate(value) {
 }
 
 function isOverdue(dateValue) {
+  if (!dateValue) return false;
   return new Date(dateValue) < TODAY;
 }
 
 function daysUntil(dateValue) {
+  if (!dateValue) return null;
   const target = new Date(dateValue);
   const diffMs = target - TODAY;
   return Math.round(diffMs / (1000 * 60 * 60 * 24));
 }
 
-function PolicyList({ policies, onSelect, onCreate, onEdit }) {
+function PolicyList({ policies, onSelect, onCreate, onEdit, onDelete }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All");
@@ -52,7 +56,8 @@ function PolicyList({ policies, onSelect, onCreate, onEdit }) {
     const term = search.trim().toLowerCase();
 
     return policies.filter((policy) => {
-      if (statusFilter !== "All" && policy.status !== statusFilter) return false;
+      if (statusFilter !== "All" && policy.status !== statusFilter)
+        return false;
       if (categoryFilter !== "All" && policy.category !== categoryFilter)
         return false;
       if (overdueOnly && !isOverdue(policy.nextReview)) return false;
@@ -74,7 +79,10 @@ function PolicyList({ policies, onSelect, onCreate, onEdit }) {
     });
   }, [policies, search, statusFilter, categoryFilter, overdueOnly]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredPolicies.length / PAGE_SIZE));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredPolicies.length / PAGE_SIZE),
+  );
   const safePage = Math.min(page, totalPages);
   const pageItems = filteredPolicies.slice(
     (safePage - 1) * PAGE_SIZE,
@@ -83,8 +91,7 @@ function PolicyList({ policies, onSelect, onCreate, onEdit }) {
 
   const overdueCount = policies.filter((p) => isOverdue(p.nextReview)).length;
   const activeCount = policies.filter((p) => p.status === "Active").length;
-  const inReviewCount = policies.filter((p) => p.status === "In Review")
-    .length;
+  const inReviewCount = policies.filter((p) => p.status === "In Review").length;
 
   function resetFilters() {
     setSearch("");
@@ -130,7 +137,9 @@ function PolicyList({ policies, onSelect, onCreate, onEdit }) {
 
             <select
               value={statusFilter}
-              onChange={(e) => handleFilterChange(setStatusFilter)(e.target.value)}
+              onChange={(e) =>
+                handleFilterChange(setStatusFilter)(e.target.value)
+              }
               className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
             >
               <option value="All">All statuses</option>
@@ -165,10 +174,7 @@ function PolicyList({ policies, onSelect, onCreate, onEdit }) {
                   : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
               }`}
             >
-              <FaTriangleExclamation
-                className="h-3 w-3"
-                aria-hidden="true"
-              />
+              <FaTriangleExclamation className="h-3 w-3" aria-hidden="true" />
               Overdue only
             </button>
 
@@ -246,6 +252,7 @@ function PolicyList({ policies, onSelect, onCreate, onEdit }) {
                     onCloseMenu={() => setOpenMenuId(null)}
                     onSelect={onSelect}
                     onEdit={onEdit}
+                    onDelete={onDelete}
                   />
                 ))
               )}
@@ -257,10 +264,8 @@ function PolicyList({ policies, onSelect, onCreate, onEdit }) {
           <p>
             Showing{" "}
             <span className="font-medium text-slate-700">
-              {pageItems.length === 0
-                ? 0
-                : (safePage - 1) * PAGE_SIZE + 1}
-              –{(safePage - 1) * PAGE_SIZE + pageItems.length}
+              {pageItems.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1}–
+              {(safePage - 1) * PAGE_SIZE + pageItems.length}
             </span>{" "}
             of{" "}
             <span className="font-medium text-slate-700">
@@ -368,10 +373,11 @@ function PolicyRow({
   onCloseMenu,
   onSelect,
   onEdit,
+  onDelete,
 }) {
   const overdue = isOverdue(policy.nextReview);
   const days = daysUntil(policy.nextReview);
-  const dueSoon = !overdue && days <= 30;
+  const dueSoon = !overdue && days != null && days <= 30;
 
   function handleRowClick(event) {
     if (event.target.closest("[data-row-action]")) return;
@@ -457,7 +463,7 @@ function PolicyRow({
           >
             {formatDate(policy.nextReview)}
           </span>
-          {overdue && (
+          {overdue && days != null && (
             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-700">
               <FaCircleExclamation className="h-2.5 w-2.5" aria-hidden="true" />
               Overdue {Math.abs(days)}d
@@ -471,63 +477,155 @@ function PolicyRow({
         </div>
       </td>
       <td className="px-4 py-3 text-right" data-row-action>
-        <div className="relative inline-block">
-          <button
-            type="button"
-            onClick={onToggleMenu}
-            className="grid h-7 w-7 place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
-            aria-label={`Actions for ${policy.code}`}
-            aria-expanded={isMenuOpen}
-          >
-            <FaEllipsisVertical className="h-3.5 w-3.5" aria-hidden="true" />
-          </button>
-          {isMenuOpen && (
-            <>
-              <button
-                type="button"
-                aria-label="Close menu"
-                onClick={onCloseMenu}
-                className="fixed inset-0 z-10 cursor-default"
-              />
-              <div className="absolute right-0 top-8 z-20 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
-                <button
-                  type="button"
-                  className="block w-full px-3 py-2 text-left text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                  onClick={() => {
-                    onCloseMenu();
-                    onEdit?.(policy.id);
-                  }}
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  className="block w-full px-3 py-2 text-left text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                  onClick={onCloseMenu}
-                >
-                  Transition status
-                </button>
-                <button
-                  type="button"
-                  className="block w-full px-3 py-2 text-left text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                  onClick={onCloseMenu}
-                >
-                  View history
-                </button>
-                <div className="border-t border-slate-100" />
-                <button
-                  type="button"
-                  className="block w-full px-3 py-2 text-left text-xs font-medium text-red-600 transition hover:bg-red-50"
-                  onClick={onCloseMenu}
-                >
-                  Delete
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+        <RowActionMenu
+          isOpen={isMenuOpen}
+          onToggle={onToggleMenu}
+          onClose={onCloseMenu}
+          policy={policy}
+          onEdit={onEdit}
+          onSelect={onSelect}
+          onDelete={onDelete}
+        />
       </td>
     </tr>
+  );
+}
+
+function RowActionMenu({
+  isOpen,
+  onToggle,
+  onClose,
+  policy,
+  onEdit,
+  onSelect,
+  onDelete,
+}) {
+  const triggerRef = useRef(null);
+  const [coords, setCoords] = useState(null);
+
+  // Position the popover under the trigger and right-align it. Re-position
+  // on scroll/resize so the menu tracks the row even if the user scrolls
+  // the table while it's open. Rendered through a portal so the table's
+  // `overflow-x-auto` parent doesn't clip it.
+  useLayoutEffect(() => {
+    if (!isOpen) return undefined;
+    function place() {
+      const node = triggerRef.current;
+      if (!node) return;
+      const rect = node.getBoundingClientRect();
+      const MENU_WIDTH = 160;
+      // Left-align under the trigger, clamp inside viewport. The 3-dot icon
+      // sits in the right-most column, so clamping naturally pulls the menu
+      // back inside the viewport when it would overflow.
+      const left = Math.max(
+        8,
+        Math.min(rect.left, window.innerWidth - MENU_WIDTH - 8),
+      );
+      setCoords({ top: rect.bottom + 4, left, width: MENU_WIDTH });
+    }
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    function onKey(e) {
+      if (e.key === "Escape") onClose?.();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, onClose]);
+
+  return (
+    <div className="inline-block">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={(e) => {
+          // Defensive: the row's onClick already bails when the click target
+          // sits inside an element with [data-row-action], but stopping
+          // propagation here makes the contract explicit and survives any
+          // future refactor that drops that ancestor attribute.
+          e.stopPropagation();
+          onToggle?.();
+        }}
+        className="grid h-7 w-7 place-items-center rounded-md text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+        aria-label={`Actions for ${policy.code}`}
+        aria-expanded={isOpen}
+      >
+        <FaEllipsisVertical className="h-3.5 w-3.5" aria-hidden="true" />
+      </button>
+      {isOpen &&
+        coords &&
+        typeof document !== "undefined" &&
+        createPortal(
+          // React portals re-bubble events through their virtual-tree parent
+          // (the row's <tr onClick>), so clicks on menu items would still
+          // trigger handleRowClick if we didn't stop them here. Wrapping in
+          // a stopPropagation handler covers every interactive child without
+          // having to plumb the call onto each menu item.
+          <div onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              aria-label="Close menu"
+              onClick={onClose}
+              className="fixed inset-0 z-40 cursor-default"
+            />
+            <div
+              role="menu"
+              style={{
+                position: "fixed",
+                top: coords.top,
+                left: coords.left,
+                width: coords.width,
+              }}
+              className="z-50 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full px-3 py-2 text-left text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                onClick={() => {
+                  onClose?.();
+                  onEdit?.(policy.id);
+                }}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full px-3 py-2 text-left text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                onClick={() => {
+                  onClose?.();
+                  // Open detail page on the Activity tab.
+                  onSelect?.(policy.id, "activity");
+                }}
+              >
+                View history
+              </button>
+              <div className="border-t border-slate-100" />
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full px-3 py-2 text-left text-xs font-medium text-red-600 transition hover:bg-red-50"
+                onClick={() => {
+                  onClose?.();
+                  onDelete?.(policy.id, policy.code);
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
+    </div>
   );
 }
 

@@ -41,6 +41,7 @@ function VersionUploader({ policy, onClose, onUpload }) {
   const [submitted, setSubmitted] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [status, setStatus] = useState("idle");
+  const [apiError, setApiError] = useState(null);
   const inputRef = useRef(null);
   const noteRef = useRef(null);
 
@@ -100,7 +101,7 @@ function VersionUploader({ policy, onClose, onUpload }) {
     event.target.value = "";
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     setSubmitted(true);
     setTouchedNote(true);
@@ -114,13 +115,20 @@ function VersionUploader({ policy, onClose, onUpload }) {
     }
 
     setStatus("uploading");
-    window.setTimeout(() => {
-      onUpload?.({
+    setApiError(null);
+    try {
+      await onUpload?.({
         file,
         changeNote: note.trim(),
         version: newVersionLabel,
       });
-    }, 700);
+      onClose?.();
+    } catch (err) {
+      setStatus("idle");
+      setApiError(
+        err?.detail ?? err?.message ?? "Upload failed. Try again.",
+      );
+    }
   }
 
   const showNoteError = (touchedNote || submitted) && noteError;
@@ -277,6 +285,15 @@ function VersionUploader({ policy, onClose, onUpload }) {
             )}
           </aside>
         </div>
+
+        {apiError && (
+          <p
+            className="rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700 ring-1 ring-red-200"
+            role="alert"
+          >
+            {apiError}
+          </p>
+        )}
 
         <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-4">
           <button

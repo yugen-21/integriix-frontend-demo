@@ -194,17 +194,6 @@ function EmptyLanding({ onPick }) {
       </div>
 
       <aside className="grid content-start gap-3">
-        <div className="rounded-3xl border border-cyan-200 bg-gradient-to-br from-white to-cyan-50/40 p-5 shadow-sm max-[520px]:rounded-2xl max-[520px]:p-4">
-          <p className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-700">
-            <FaLightbulb className="h-3 w-3" aria-hidden="true" />
-            How it works
-          </p>
-          <p className="mt-2 text-[11px] leading-5 text-slate-600">
-            We embed policy paragraphs and concept tags, then rank them against
-            the query. Demo mode uses curated answers; the real backend will
-            swap in vector search without changing this UI.
-          </p>
-        </div>
         <div className="rounded-3xl border border-white/80 bg-white p-5 shadow-sm max-[520px]:rounded-2xl max-[520px]:p-4">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
             Tip
