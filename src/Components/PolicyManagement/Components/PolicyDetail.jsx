@@ -1989,6 +1989,8 @@ function BodyChecklistSection({ body, data, total, coveragePct, onViewFull }) {
               meta={formatChapterMeta(el.jciContext)}
               metaText={el.citation?.excerpt}
               status="covered"
+              jciContext={el.jciContext}
+              citation={el.citation}
               onViewFull={() => onViewFull({ kind: "covered", el })}
             />
           ))}
@@ -2004,6 +2006,7 @@ function BodyChecklistSection({ body, data, total, coveragePct, onViewFull }) {
               status="gap"
               severity={el.severity}
               recommendedTemplate={el.recommendedTemplate}
+              jciContext={el.jciContext}
               onViewFull={() => onViewFull({ kind: "gap", el })}
             />
           ))}
@@ -2250,6 +2253,8 @@ function ChecklistRow({
   status,
   severity,
   recommendedTemplate,
+  jciContext,
+  citation,
   onViewFull,
 }) {
   return (
@@ -2320,8 +2325,117 @@ function ChecklistRow({
             elementText={text}
           />
         )}
+        <ChecklistRowPrintDetails
+          status={status}
+          jciContext={jciContext}
+          citation={citation}
+          recommendedTemplate={recommendedTemplate}
+        />
       </div>
     </li>
+  );
+}
+
+function ChecklistRowPrintDetails({
+  status,
+  jciContext,
+  citation,
+  recommendedTemplate,
+}) {
+  const ctx = jciContext;
+  const hasChapter = ctx && (ctx.chapterCode || ctx.chapterName);
+  const hasGoal = ctx && (ctx.goalCode || ctx.goalName);
+  const hasMEs =
+    ctx && ctx.measurableElements && ctx.measurableElements.length > 0;
+  const hasJci =
+    ctx &&
+    (hasChapter || hasGoal || ctx.intentText || ctx.rationaleText || hasMEs);
+  const hasCitationLabel =
+    status === "covered" &&
+    citation &&
+    citation.label &&
+    citation.label !== "Matched policy text";
+  const hasTemplate = status === "gap" && recommendedTemplate;
+  if (!hasJci && !hasCitationLabel && !hasTemplate) return null;
+  return (
+    <div className="hidden print:block mt-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-[11px] leading-5 text-slate-700">
+      {hasJci && (
+        <div className="grid gap-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+            JCI context
+          </p>
+          {hasGoal && (
+            <p>
+              <span className="font-semibold uppercase tracking-wide text-slate-500">
+                Goal:{" "}
+              </span>
+              {ctx.goalCode && (
+                <span className="font-semibold text-slate-900">
+                  {ctx.goalCode}
+                </span>
+              )}
+              {ctx.goalCode && ctx.goalName && " · "}
+              {ctx.goalName}
+            </p>
+          )}
+          {ctx.intentText && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                Intent
+              </p>
+              <p className="whitespace-pre-wrap">{ctx.intentText}</p>
+            </div>
+          )}
+          {ctx.rationaleText && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                Rationale
+              </p>
+              <p className="whitespace-pre-wrap">{ctx.rationaleText}</p>
+            </div>
+          )}
+          {hasMEs && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                Measurable elements
+              </p>
+              <ol className="mt-0.5 grid gap-1">
+                {ctx.measurableElements.map((me) => (
+                  <li key={me.code} className="flex gap-2">
+                    <span className="shrink-0 font-semibold text-slate-700">
+                      ME {me.number}
+                    </span>
+                    <span>{me.text}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+        </div>
+      )}
+      {hasCitationLabel && (
+        <p className="mt-1 text-[10px] text-slate-500">
+          From section: {citation.label}
+        </p>
+      )}
+      {hasTemplate && (
+        <div className="mt-2 border-t border-slate-200 pt-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-cyan-700">
+            Recommended template
+          </p>
+          <p className="text-[11px] text-slate-800">
+            <span className="font-semibold">{recommendedTemplate.code}</span>
+            {" — "}
+            {recommendedTemplate.title}
+          </p>
+          {recommendedTemplate.filename && (
+            <p className="text-[10px] text-slate-500">
+              {recommendedTemplate.filename}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2662,6 +2776,9 @@ function buildChecklistPdf(
         meta: formatChapterMeta(el.jciContext) ?? "",
         metaText: el.citation?.excerpt ?? "",
         severity: "",
+        jciContext: el.jciContext,
+        citation: el.citation,
+        recommendedTemplate: null,
       })),
       ...data.gaps.map((el) => ({
         status: "gap",
@@ -2671,6 +2788,9 @@ function buildChecklistPdf(
         meta: `Gap · ${el.severity}`,
         metaText: el.remediation ?? "",
         severity: el.severity,
+        jciContext: el.jciContext,
+        citation: null,
+        recommendedTemplate: el.recommendedTemplate ?? null,
       })),
     ];
 
@@ -2780,6 +2900,99 @@ function buildChecklistPdf(
             indent: 18,
           },
         );
+      }
+
+      const ctx = it.jciContext;
+      if (ctx) {
+        if (ctx.goalCode || ctx.goalName) {
+          const goalLine = [ctx.goalCode, ctx.goalName]
+            .filter(Boolean)
+            .join(" · ");
+          drawTextBlock(`Goal: ${goalLine}`, {
+            size: 8,
+            style: "bold",
+            color: [51, 65, 85],
+            indent: 18,
+          });
+        }
+        if (ctx.intentText) {
+          drawTextBlock("Intent", {
+            size: 7,
+            style: "bold",
+            color: [100, 116, 139],
+            indent: 18,
+          });
+          drawTextBlock(ctx.intentText, {
+            size: 8,
+            color: [71, 85, 105],
+            indent: 18,
+          });
+        }
+        if (ctx.rationaleText) {
+          drawTextBlock("Rationale", {
+            size: 7,
+            style: "bold",
+            color: [100, 116, 139],
+            indent: 18,
+          });
+          drawTextBlock(ctx.rationaleText, {
+            size: 8,
+            color: [71, 85, 105],
+            indent: 18,
+          });
+        }
+        if (ctx.measurableElements && ctx.measurableElements.length > 0) {
+          drawTextBlock("Measurable elements", {
+            size: 7,
+            style: "bold",
+            color: [100, 116, 139],
+            indent: 18,
+          });
+          ctx.measurableElements.forEach((me) => {
+            drawTextBlock(`ME ${me.number}. ${me.text}`, {
+              size: 8,
+              color: [71, 85, 105],
+              indent: 26,
+            });
+          });
+        }
+      }
+
+      if (
+        it.status === "covered" &&
+        it.citation &&
+        it.citation.label &&
+        it.citation.label !== "Matched policy text"
+      ) {
+        drawTextBlock(`From section: ${it.citation.label}`, {
+          size: 8,
+          color: [100, 116, 139],
+          indent: 18,
+        });
+      }
+
+      if (it.status === "gap" && it.recommendedTemplate) {
+        drawTextBlock("Recommended template", {
+          size: 7,
+          style: "bold",
+          color: [14, 116, 144],
+          indent: 18,
+        });
+        drawTextBlock(
+          `${it.recommendedTemplate.code} — ${it.recommendedTemplate.title}`,
+          {
+            size: 8,
+            color: [51, 65, 85],
+            indent: 18,
+          },
+        );
+        if (it.recommendedTemplate.filename) {
+          drawTextBlock(it.recommendedTemplate.filename, {
+            size: 7,
+            color: [100, 116, 139],
+            indent: 18,
+          });
+        }
       }
 
       y += 4;
