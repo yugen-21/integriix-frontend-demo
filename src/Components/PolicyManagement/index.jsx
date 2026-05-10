@@ -89,6 +89,7 @@ function adaptApiDetail(api) {
   });
   const currentVersion = versions[0];
 
+  const apiBase = import.meta.env.VITE_API_URL;
   const versionItems = versions.map((v) => ({
     id: v.id,
     version: v.version ? `v${v.version}` : "—",
@@ -97,8 +98,12 @@ function adaptApiDetail(api) {
     uploadedBy: v.uploaded_by ?? "—",
     uploadedAt: v.created_at,
     fileName: basename(v.file_path),
+    // api.file_link is a path like "/v1/policies/2/file" — prepend the
+    // backend host so download links don't resolve against the Vercel origin.
     fileUrl:
-      currentVersion && v.id === currentVersion.id ? api.file_link : null,
+      currentVersion && v.id === currentVersion.id && api.file_link
+        ? `${apiBase}${api.file_link}`
+        : null,
   }));
 
   const activityItems = (api.activity ?? []).map((entry) => ({
@@ -142,7 +147,9 @@ function adaptApiDetail(api) {
     nextReview: nextReviewDateOnly,
     audienceRule: matchedRule?.id,
     accreditationTags: ["JCI"],
-    fileLink: api.file_link ?? null,
+    // Backend returns a path like "/v1/policies/2/file"; prepend the API
+    // base so iframes/downloads hit the tunnel host, not the Vercel origin.
+    fileLink: api.file_link ? `${apiBase}${api.file_link}` : null,
     detail: {
       summary: api.summary ?? "Summary not available yet.",
       appliesTo: api.audience_rule ? [api.audience_rule] : [],
