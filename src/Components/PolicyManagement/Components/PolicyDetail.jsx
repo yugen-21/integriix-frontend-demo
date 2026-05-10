@@ -1646,8 +1646,8 @@ function ChecklistTab({ policy }) {
             Audit is being generated…
           </p>
           <p className="text-xs text-slate-500">
-            The background pipeline (chunking, embedding, scoring) usually takes
-            30–60 seconds. We'll refresh automatically.
+            The process usually takes 30–60 seconds. We'll refresh
+            automatically.
           </p>
         </div>
       );
