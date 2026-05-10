@@ -190,9 +190,25 @@ function PolicyManagement() {
   // Mutation watcher is declared after selectedPolicyId below.
 
   const [policies, setPolicies] = useState(mockPolicies);
-  const [selectedPolicyId, setSelectedPolicyId] = useState(null);
+  // Lazy initializer reads ?policy=ID from the URL so deep-links from
+  // /search land directly on the detail view instead of the list.
+  const [selectedPolicyId, setSelectedPolicyId] = useState(() => {
+    const fromUrl = readPolicyIdFromUrl();
+    if (!fromUrl) return null;
+    const asInt = Number.parseInt(fromUrl, 10);
+    return Number.isFinite(asInt) ? asInt : fromUrl;
+  });
   const [initialDetailTab, setInitialDetailTab] = useState("overview");
   const [formState, setFormState] = useState(null);
+
+  // Fetch the deep-linked policy on mount. Separate effect so it only fires
+  // when an ID was actually provided in the URL.
+  useEffect(() => {
+    if (selectedPolicyId !== null) {
+      dispatch(fetchPolicyById(selectedPolicyId));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch]);
 
   function handleSelectPolicy(id, tab = "overview") {
     setSelectedPolicyId(id);
