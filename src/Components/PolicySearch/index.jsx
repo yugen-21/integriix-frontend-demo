@@ -1,16 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FaArrowRight,
-  FaCircleCheck,
-  FaLightbulb,
+  FaCircleExclamation,
   FaMagnifyingGlass,
   FaQuoteLeft,
-  FaStar,
+  FaSpinner,
   FaWandMagicSparkles,
   FaXmark,
 } from "react-icons/fa6";
-import { highlightTokens, searchPolicies } from "../../services/searchPolicies";
-import { suggestedQueries } from "../../data/mockSearch";
+import policyAPI from "../../services/policyAPI";
+
+const SEARCH_LIMIT = 20;
 
 function readQueryFromUrl() {
   if (typeof window === "undefined") return "";
@@ -28,27 +28,103 @@ function navigateToPolicy(id) {
   window.location.assign(`/policy-management?policy=${encodeURIComponent(id)}`);
 }
 
-const statusStyles = {
-  Draft: "bg-slate-100 text-slate-700 ring-slate-200",
-  "In Review": "bg-amber-50 text-amber-700 ring-amber-200",
-  Approved: "bg-cyan-50 text-cyan-700 ring-cyan-200",
-  Active: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  Archived: "bg-slate-100 text-slate-500 ring-slate-200",
+const STATUS_LABEL = {
+  draft: "Draft",
+  in_review: "In Review",
+  published: "Active",
+  archived: "Archived",
 };
+
+const STATUS_STYLES = {
+  draft: "bg-slate-100 text-slate-700 ring-slate-200",
+  in_review: "bg-amber-50 text-amber-700 ring-amber-200",
+  published: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  archived: "bg-slate-100 text-slate-500 ring-slate-200",
+};
+
+const STOPWORDS = new Set([
+  "the", "a", "an", "of", "for", "to", "in", "on", "and", "or",
+  "is", "are", "be", "we", "i", "you", "with", "by", "this", "that",
+  "what", "how", "do", "does", "should", "must", "from", "at", "as",
+  "our", "their", "your", "my", "have", "has", "had", "it", "its",
+]);
+
+function tokenize(text) {
+  return (text ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length > 1 && !STOPWORDS.has(t));
+}
+
+// Pure: split `text` into segments, marking matches against query tokens.
+function highlightTokens(text, query) {
+  const tokens = tokenize(query);
+  if (tokens.length === 0 || !text) {
+    return [{ type: "text", value: text ?? "", key: "0" }];
+  }
+  const escaped = tokens
+    .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+  const regex = new RegExp(`(${escaped})`, "gi");
+  const parts = String(text).split(regex);
+  return parts
+    .filter((part) => part !== "")
+    .map((part, idx) => {
+      const lower = part.toLowerCase();
+      const isMatch = tokens.some((t) => lower === t || lower.startsWith(t));
+      return isMatch
+        ? { type: "match", value: part, key: `${idx}-m` }
+        : { type: "text", value: part, key: `${idx}-t` };
+    });
+}
 
 function PolicySearch() {
   const initialQuery = useMemo(() => readQueryFromUrl(), []);
   const [draft, setDraft] = useState(initialQuery);
+  // status: "idle" | "loading" | "success" | "error"
+  const [status, setStatus] = useState(initialQuery ? "loading" : "idle");
+  const [items, setItems] = useState([]);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const result = useMemo(() => searchPolicies(initialQuery), [initialQuery]);
+  useEffect(() => {
+    if (!initialQuery) {
+      setStatus("idle");
+      setItems([]);
+      return;
+    }
+
+    let cancelled = false;
+    setStatus("loading");
+    setErrorMessage("");
+
+    policyAPI
+      .searchPolicies(initialQuery, SEARCH_LIMIT)
+      .then((response) => {
+        if (cancelled) return;
+        const data = response?.data ?? {};
+        setItems(Array.isArray(data.items) ? data.items : []);
+        setStatus("success");
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        const detail =
+          err?.response?.data?.detail ||
+          err?.message ||
+          "Search request failed.";
+        setErrorMessage(String(detail));
+        setItems([]);
+        setStatus("error");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialQuery]);
 
   function handleSubmit(event) {
     event.preventDefault();
     navigateToSearch(draft);
-  }
-
-  function pickSuggestion(query) {
-    navigateToSearch(query);
   }
 
   return (
@@ -63,15 +139,15 @@ function PolicySearch() {
         hasQuery={Boolean(initialQuery)}
       />
 
-      {result.mode === "empty" ? (
-        <EmptyLanding onPick={pickSuggestion} />
-      ) : (
-        <ResultsView
-          result={result}
-          query={initialQuery}
-          onPick={pickSuggestion}
-        />
-      )}
+      {status === "idle" && <IdleState />}
+      {status === "loading" && <LoadingState query={initialQuery} />}
+      {status === "error" && <ErrorState message={errorMessage} />}
+      {status === "success" &&
+        (items.length === 0 ? (
+          <NoResults query={initialQuery} />
+        ) : (
+          <ResultsView items={items} query={initialQuery} />
+        ))}
     </div>
   );
 }
@@ -158,100 +234,83 @@ function SearchBar({ draft, onChange, onSubmit, onClear, hasQuery }) {
   );
 }
 
-function EmptyLanding({ onPick }) {
+function IdleState() {
   return (
-    <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="rounded-3xl border border-white/80 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.06)] max-[520px]:rounded-2xl max-[520px]:p-4">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-cyan-700">
-          Try one of these
-        </p>
-        <h2 className="mt-1 text-base font-semibold text-slate-900">
-          Curated demo queries
-        </h2>
-        <p className="mt-1 text-xs text-slate-500">
-          Click a query to see how the engine surfaces policies even when the
-          exact words are not in them.
-        </p>
-
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          {suggestedQueries.map((query) => (
-            <button
-              key={query}
-              type="button"
-              onClick={() => onPick(query)}
-              className="group flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-left transition hover:-translate-y-0.5 hover:border-cyan-300 hover:bg-white hover:shadow-sm"
-            >
-              <span className="min-w-0 text-sm font-medium text-slate-800 group-hover:text-cyan-700">
-                {query}
-              </span>
-              <FaArrowRight
-                className="h-3 w-3 shrink-0 text-slate-400 group-hover:text-cyan-600"
-                aria-hidden="true"
-              />
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <aside className="grid content-start gap-3">
-        <div className="rounded-3xl border border-cyan-200 bg-gradient-to-br from-white to-cyan-50/40 p-5 shadow-sm max-[520px]:rounded-2xl max-[520px]:p-4">
-          <p className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-700">
-            <FaLightbulb className="h-3 w-3" aria-hidden="true" />
-            How it works
-          </p>
-          <p className="mt-2 text-[11px] leading-5 text-slate-600">
-            We embed policy paragraphs and concept tags, then rank them against
-            the query. Demo mode uses curated answers; the real backend will
-            swap in vector search without changing this UI.
-          </p>
-        </div>
-        <div className="rounded-3xl border border-white/80 bg-white p-5 shadow-sm max-[520px]:rounded-2xl max-[520px]:p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-            Tip
-          </p>
-          <p className="mt-2 text-[11px] leading-5 text-slate-600">
-            Phrase the question the way a clinician would: “what do we do
-            when…”, “who can…”. Keyword fragments still work, but full sentences
-            score better.
-          </p>
-        </div>
-      </aside>
+    <section className="grid place-items-center gap-2 rounded-3xl border border-white/80 bg-white p-10 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] max-[520px]:rounded-2xl max-[520px]:p-6">
+      <span className="grid h-10 w-10 place-items-center rounded-2xl bg-cyan-50 text-cyan-700">
+        <FaMagnifyingGlass className="h-4 w-4" aria-hidden="true" />
+      </span>
+      <p className="text-sm font-semibold text-slate-700">
+        Type a question to begin
+      </p>
+      <p className="max-w-md text-xs text-slate-500">
+        Results are pulled live from your indexed policies. Phrase the question
+        the way a clinician would — full sentences score better than keywords.
+      </p>
     </section>
   );
 }
 
-function ResultsView({ result, query, onPick }) {
-  const { results, mode, rationale, curatedLabel } = result;
+function LoadingState({ query }) {
+  return (
+    <section className="grid place-items-center gap-2 rounded-3xl border border-white/80 bg-white p-10 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] max-[520px]:rounded-2xl max-[520px]:p-6">
+      <FaSpinner
+        className="h-5 w-5 animate-spin text-cyan-600"
+        aria-hidden="true"
+      />
+      <p className="text-sm font-semibold text-slate-700">
+        Searching for “{query}”…
+      </p>
+      <p className="text-[11px] text-slate-500">
+        First call after server start can take a few seconds while the embedding
+        model warms up.
+      </p>
+    </section>
+  );
+}
 
-  if (results.length === 0) {
-    return <NoResults query={query} onPick={onPick} />;
-  }
+function ErrorState({ message }) {
+  return (
+    <section className="grid gap-2 rounded-3xl border border-rose-200 bg-rose-50/60 p-6 text-center shadow-sm max-[520px]:rounded-2xl max-[520px]:p-4">
+      <span className="mx-auto grid h-10 w-10 place-items-center rounded-2xl bg-white text-rose-600 ring-1 ring-rose-200">
+        <FaCircleExclamation className="h-4 w-4" aria-hidden="true" />
+      </span>
+      <p className="text-sm font-semibold text-rose-800">Search failed</p>
+      <p className="mx-auto max-w-md text-xs text-rose-700/80">{message}</p>
+    </section>
+  );
+}
 
+function NoResults({ query }) {
+  return (
+    <section className="grid gap-2 rounded-3xl border border-white/80 bg-white p-6 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] max-[520px]:rounded-2xl max-[520px]:p-4">
+      <span className="mx-auto grid h-10 w-10 place-items-center rounded-2xl bg-slate-100 text-slate-500">
+        <FaMagnifyingGlass className="h-4 w-4" aria-hidden="true" />
+      </span>
+      <p className="text-sm font-semibold text-slate-700">
+        No policies matched “{query}”
+      </p>
+      <p className="mx-auto max-w-md text-xs text-slate-500">
+        Try rephrasing the question, or upload more policies so the search has
+        something to draw from.
+      </p>
+    </section>
+  );
+}
+
+function ResultsView({ items, query }) {
   return (
     <div className="grid gap-4">
-      {(mode === "curated" || mode === "curated-fuzzy") && (
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-cyan-200 bg-cyan-50/70 px-4 py-3 text-xs text-cyan-900">
-          <FaStar className="h-3 w-3" aria-hidden="true" />
-          <span className="font-semibold">
-            Matched curated answer{" "}
-            {mode === "curated-fuzzy" && curatedLabel
-              ? `(${curatedLabel})`
-              : ""}
-          </span>
-          <span className="text-cyan-800/80">— {rationale}</span>
-        </div>
-      )}
-
       <p className="text-[11px] text-slate-500">
-        {results.length} result{results.length === 1 ? "" : "s"} for{" "}
+        {items.length} result{items.length === 1 ? "" : "s"} for{" "}
         <span className="font-semibold text-slate-700">“{query}”</span>
       </p>
 
       <ol className="grid gap-3">
-        {results.map((entry, idx) => (
+        {items.map((hit, idx) => (
           <ResultCard
-            key={`${entry.policy.id}-${entry.paragraph?.id ?? idx}`}
-            entry={entry}
+            key={`${hit.id}-${hit.chunk_index ?? idx}`}
+            hit={hit}
             rank={idx + 1}
             query={query}
           />
@@ -261,18 +320,18 @@ function ResultsView({ result, query, onPick }) {
   );
 }
 
-function ResultCard({ entry, rank, query }) {
-  const { policy, paragraph, score, why } = entry;
-  const titleParts = highlightTokens(policy.title, query);
-  const snippetParts = paragraph
-    ? highlightTokens(paragraph.text, query)
-    : null;
+function ResultCard({ hit, rank, query }) {
+  const titleParts = highlightTokens(hit.title, query);
+  const snippetParts = hit.snippet ? highlightTokens(hit.snippet, query) : null;
+  const statusKey = String(hit.status ?? "").toLowerCase();
+  const statusLabel = STATUS_LABEL[statusKey] ?? hit.status ?? "Unknown";
+  const statusClass = STATUS_STYLES[statusKey] ?? STATUS_STYLES.draft;
 
   return (
     <li>
       <button
         type="button"
-        onClick={() => navigateToPolicy(policy.id)}
+        onClick={() => navigateToPolicy(hit.id)}
         className="group grid w-full gap-3 rounded-3xl border border-white/80 bg-white p-5 text-left shadow-[0_18px_45px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-[0_22px_55px_rgba(15,23,42,0.10)] max-[520px]:rounded-2xl max-[520px]:p-4"
       >
         <div className="flex items-start justify-between gap-3">
@@ -282,21 +341,18 @@ function ResultCard({ entry, rank, query }) {
                 {rank}
               </span>
               <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
-                {policy.code}
+                {hit.code}
               </span>
               <span
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${statusStyles[policy.status] ?? statusStyles.Draft}`}
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${statusClass}`}
               >
-                {policy.status}
+                {statusLabel}
               </span>
-              {policy.accreditationTags?.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded bg-cyan-50 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-700 ring-1 ring-cyan-200"
-                >
-                  {tag}
+              {hit.category && (
+                <span className="rounded bg-cyan-50 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-700 ring-1 ring-cyan-200">
+                  {hit.category}
                 </span>
-              ))}
+              )}
             </div>
             <h3 className="mt-2 text-sm font-semibold leading-snug text-slate-900 group-hover:text-cyan-700">
               {titleParts.map((part) =>
@@ -312,24 +368,23 @@ function ResultCard({ entry, rank, query }) {
                 ),
               )}
             </h3>
-            <p className="mt-1 text-[11px] text-slate-500">
-              {policy.department} · {policy.owner}
-            </p>
           </div>
 
           <div className="flex flex-col items-end gap-2">
-            <ScorePill score={score} />
+            <ScorePill score={hit.score} />
           </div>
         </div>
 
-        {paragraph && (
+        {snippetParts && (
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
-            <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-              <FaQuoteLeft className="h-2.5 w-2.5" aria-hidden="true" />
-              {paragraph.heading}
-            </p>
+            {hit.section_name && (
+              <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                <FaQuoteLeft className="h-2.5 w-2.5" aria-hidden="true" />
+                {hit.section_name}
+              </p>
+            )}
             <p className="mt-2 text-xs leading-5 text-slate-700">
-              {snippetParts?.map((part) =>
+              {snippetParts.map((part) =>
                 part.type === "match" ? (
                   <mark
                     key={part.key}
@@ -342,29 +397,7 @@ function ResultCard({ entry, rank, query }) {
                 ),
               )}
             </p>
-            {paragraph.concepts?.length > 0 && (
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                {paragraph.concepts.map((concept) => (
-                  <span
-                    key={concept}
-                    className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600 ring-1 ring-slate-200"
-                  >
-                    {concept}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
-        )}
-
-        {why && (
-          <p className="inline-flex items-center gap-1.5 text-[11px] text-slate-500">
-            <FaCircleCheck
-              className="h-2.5 w-2.5 text-cyan-600"
-              aria-hidden="true"
-            />
-            {why}
-          </p>
         )}
 
         <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-cyan-700 transition group-hover:gap-2">
@@ -377,49 +410,21 @@ function ResultCard({ entry, rank, query }) {
 }
 
 function ScorePill({ score }) {
-  const pct = Math.round(score * 100);
+  const numeric = Number(score) || 0;
+  const pct = Math.round(numeric * 100);
   const tone =
-    score >= 0.85
+    numeric >= 0.85
       ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-      : score >= 0.65
+      : numeric >= 0.65
         ? "bg-cyan-50 text-cyan-700 ring-cyan-200"
         : "bg-slate-100 text-slate-700 ring-slate-200";
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${tone}`}
     >
-      {score.toFixed(2)}
+      {numeric.toFixed(2)}
       <span className="text-[10px] font-medium opacity-70">({pct}%)</span>
     </span>
-  );
-}
-
-function NoResults({ query, onPick }) {
-  return (
-    <section className="grid gap-3 rounded-3xl border border-white/80 bg-white p-6 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] max-[520px]:rounded-2xl max-[520px]:p-4">
-      <span className="mx-auto grid h-10 w-10 place-items-center rounded-2xl bg-slate-100 text-slate-500">
-        <FaMagnifyingGlass className="h-4 w-4" aria-hidden="true" />
-      </span>
-      <p className="text-sm font-semibold text-slate-700">
-        Nothing matched “{query}” strongly enough
-      </p>
-      <p className="mx-auto max-w-md text-xs text-slate-500">
-        Try one of the curated demo queries below — they show off the semantic
-        engine even when the exact words are not in the policy text.
-      </p>
-      <div className="mt-2 flex flex-wrap justify-center gap-2">
-        {suggestedQueries.slice(0, 4).map((q) => (
-          <button
-            key={q}
-            type="button"
-            onClick={() => onPick(q)}
-            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:border-cyan-300 hover:text-cyan-700"
-          >
-            {q}
-          </button>
-        ))}
-      </div>
-    </section>
   );
 }
 
