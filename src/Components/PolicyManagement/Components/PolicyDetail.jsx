@@ -1585,6 +1585,33 @@ function ActivityTab({ policy }) {
   );
 }
 
+function formatChapterMeta(jciContext) {
+  if (!jciContext) return null;
+  const code = jciContext.chapterCode;
+  const name = jciContext.chapterName;
+  if (code && name) return `${code} · ${name}`;
+  if (code) return code;
+  if (name) return name;
+  return null;
+}
+
+function adaptJciContext(ctx) {
+  if (!ctx) return null;
+  return {
+    chapterCode: ctx.chapter_code ?? null,
+    chapterName: ctx.chapter_name ?? null,
+    goalCode: ctx.goal_code ?? null,
+    goalName: ctx.goal_name ?? null,
+    intentText: ctx.intent_text ?? null,
+    rationaleText: ctx.rationale_text ?? null,
+    measurableElements: (ctx.measurable_elements ?? []).map((me) => ({
+      code: me.code,
+      number: me.number,
+      text: me.text,
+    })),
+  };
+}
+
 function adaptAuditToGapAnalysis(api) {
   const jci = api?.JCI ?? { covered: [], gaps: [] };
   return {
@@ -1594,6 +1621,7 @@ function adaptAuditToGapAnalysis(api) {
         label: c.label,
         text: c.text,
         citation: c.citation ?? null,
+        jciContext: adaptJciContext(c.jci_context),
       })),
       gaps: (jci.gaps ?? []).map((g) => ({
         code: g.code,
@@ -1602,6 +1630,7 @@ function adaptAuditToGapAnalysis(api) {
         severity: g.severity,
         remediation: g.remediation,
         recommendedTemplate: g.recommended_template ?? null,
+        jciContext: adaptJciContext(g.jci_context),
       })),
     },
   };
@@ -1957,7 +1986,7 @@ function BodyChecklistSection({ body, data, total, coveragePct, onViewFull }) {
               code={el.code}
               label={el.label}
               text={el.text}
-              meta={el.citation && `Citation: ${el.citation.label}`}
+              meta={formatChapterMeta(el.jciContext)}
               metaText={el.citation?.excerpt}
               status="covered"
               onViewFull={() => onViewFull({ kind: "covered", el })}
@@ -1980,6 +2009,98 @@ function BodyChecklistSection({ body, data, total, coveragePct, onViewFull }) {
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+function JciContextSection({ ctx }) {
+  if (!ctx) return null;
+  const hasChapter = ctx.chapterCode || ctx.chapterName;
+  const hasGoal = ctx.goalCode || ctx.goalName;
+  const hasMEs = ctx.measurableElements && ctx.measurableElements.length > 0;
+  if (
+    !hasChapter &&
+    !hasGoal &&
+    !ctx.intentText &&
+    !ctx.rationaleText &&
+    !hasMEs
+  ) {
+    return null;
+  }
+  return (
+    <section className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+        JCI context
+      </p>
+      <dl className="mt-2 grid gap-2 text-xs leading-6 text-slate-700">
+        {hasChapter && (
+          <div>
+            <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Chapter
+            </dt>
+            <dd className="mt-0.5">
+              {ctx.chapterCode && (
+                <span className="font-semibold text-slate-900">
+                  {ctx.chapterCode}
+                </span>
+              )}
+              {ctx.chapterCode && ctx.chapterName && " · "}
+              {ctx.chapterName}
+            </dd>
+          </div>
+        )}
+        {hasGoal && (
+          <div>
+            <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Goal
+            </dt>
+            <dd className="mt-0.5">
+              {ctx.goalCode && (
+                <span className="font-semibold text-slate-900">
+                  {ctx.goalCode}
+                </span>
+              )}
+              {ctx.goalCode && ctx.goalName && " · "}
+              {ctx.goalName}
+            </dd>
+          </div>
+        )}
+        {ctx.intentText && (
+          <div>
+            <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Intent
+            </dt>
+            <dd className="mt-0.5 whitespace-pre-wrap">{ctx.intentText}</dd>
+          </div>
+        )}
+        {ctx.rationaleText && (
+          <div>
+            <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Rationale
+            </dt>
+            <dd className="mt-0.5 whitespace-pre-wrap">{ctx.rationaleText}</dd>
+          </div>
+        )}
+        {hasMEs && (
+          <div>
+            <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Measurable elements
+            </dt>
+            <dd className="mt-0.5">
+              <ol className="grid gap-1.5">
+                {ctx.measurableElements.map((me) => (
+                  <li key={me.code} className="flex gap-2">
+                    <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700">
+                      ME {me.number}
+                    </span>
+                    <span className="leading-6">{me.text}</span>
+                  </li>
+                ))}
+              </ol>
+            </dd>
+          </div>
+        )}
+      </dl>
     </section>
   );
 }
@@ -2064,14 +2185,22 @@ function RequirementDetailModal({ item, onClose }) {
             </p>
           </section>
 
+          <JciContextSection ctx={el.jciContext} />
+
           {isCovered && el.citation && (
             <section>
               <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                Citation · {el.citation.label ?? "—"}
+                Matched policy text
               </p>
               <blockquote className="mt-1 rounded-lg border-l-4 border-emerald-300 bg-emerald-50/50 px-3 py-2 text-xs leading-6 text-slate-700">
                 {el.citation.excerpt || "—"}
               </blockquote>
+              {el.citation.label &&
+                el.citation.label !== "Matched policy text" && (
+                  <p className="mt-1 text-[10px] text-slate-500">
+                    From section: {el.citation.label}
+                  </p>
+                )}
             </section>
           )}
 
@@ -2530,7 +2659,7 @@ function buildChecklistPdf(
         code: el.code,
         label: el.label,
         text: el.text,
-        meta: el.citation ? `Citation: ${el.citation.label}` : "",
+        meta: formatChapterMeta(el.jciContext) ?? "",
         metaText: el.citation?.excerpt ?? "",
         severity: "",
       })),
