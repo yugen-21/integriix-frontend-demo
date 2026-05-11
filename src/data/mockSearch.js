@@ -1,4 +1,4 @@
-// Curated semantic-search mock for the Integriix demo.
+// Curated semantic-search mock for the MedullaAI demo.
 //
 // `paragraphLibrary` holds short text chunks per policy that the engine scores
 // against. `curatedQueries` is a small set of demo prompts that surface

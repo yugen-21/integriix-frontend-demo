@@ -1,7 +1,8 @@
 import { useState } from "react";
 import * as FaIcons from "react-icons/fa6";
-import { FaChevronDown, FaChevronUp, FaXmark } from "react-icons/fa6";
+import { FaChevronDown, FaXmark } from "react-icons/fa6";
 import menuItems from "../menu.json";
+import medullaIcon from "../assets/MedullaAI-icon.png";
 
 function MenuIcon({ name }) {
   const Icon = FaIcons[name] ?? FaIcons.FaCircle;
@@ -62,12 +63,16 @@ function Aside({ isOpen = false, onClose }) {
       >
         <div className="absolute inset-x-0 top-0 h-40 bg-[linear-gradient(180deg,rgba(34,211,238,0.18),rgba(8,36,61,0))]" />
         <div className="relative flex items-center gap-3 border-b border-blue-100/15 pb-6">
-          <span className="grid h-12 w-12 place-items-center rounded-xl bg-cyan-500 font-black text-white shadow-lg shadow-cyan-950/25 ring-1 ring-white/20">
-            Ix
+          <span className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-white shadow-lg shadow-cyan-950/25 ring-1 ring-white/20">
+            <img
+              src={medullaIcon}
+              alt="MedullaAI"
+              className="h-10 w-10 object-contain"
+            />
           </span>
           <div>
-            <p className="text-lg font-bold text-white">Integriix</p>
-            <p className="text-sm text-cyan-100/75">Governance AI</p>
+            <p className="text-lg font-bold text-white">MedullaAI</p>
+            <p className="text-sm text-cyan-100/75">A Hospital's Synapse</p>
           </div>
           <button
             className="ml-auto hidden h-10 w-10 place-items-center rounded-xl bg-white/10 text-white transition hover:bg-white/15 max-[900px]:grid"
@@ -116,7 +121,7 @@ function Aside({ isOpen = false, onClose }) {
 
                   {hasSubmenu ? (
                     <button
-                      className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/8 text-cyan-100 transition hover:bg-white/12 hover:text-white"
+                      className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-blue-100/50 transition hover:bg-white/5 hover:text-white"
                       type="button"
                       aria-expanded={isExpanded}
                       aria-label={
@@ -126,17 +131,12 @@ function Aside({ isOpen = false, onClose }) {
                       }
                       onClick={() => toggleSection(item.name)}
                     >
-                      {isExpanded ? (
-                        <FaChevronUp
-                          className="h-3.5 w-3.5"
-                          aria-hidden="true"
-                        />
-                      ) : (
-                        <FaChevronDown
-                          className="h-3.5 w-3.5"
-                          aria-hidden="true"
-                        />
-                      )}
+                      <FaChevronDown
+                        className={`h-2.5 w-2.5 transition-transform duration-200 ${
+                          isExpanded ? "rotate-180" : ""
+                        }`}
+                        aria-hidden="true"
+                      />
                     </button>
                   ) : null}
                 </div>

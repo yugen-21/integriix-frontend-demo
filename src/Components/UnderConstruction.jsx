@@ -17,7 +17,7 @@ function UnderConstruction({ sectionName }) {
             {sectionName} is under construction
           </h2>
           <p className="mt-3 max-w-3xl text-sm font-semibold leading-6 text-slate-600">
-            This workspace is planned for the Integriix C-suite command center.
+            This workspace is planned for the MedullaAI C-suite command center.
             The Daily Brief dashboard is available now while this module is
             being prepared.
           </p>

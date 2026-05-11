@@ -64,29 +64,176 @@
     ]
   },
   {
-    "name": "Financials",
-    "url": "/financials",
-    "icon": "FaSackDollar"
+    "name": "Quality, Safety & Accreditation",
+    "url": "/quality-safety-accreditation",
+    "icon": "FaShieldHalved",
+    "submenu": [
+      {
+        "name": "Incidents",
+        "url": "/quality-safety-accreditation/incidents",
+        "icon": "FaTriangleExclamation"
+      },
+      {
+        "name": "CAPAs",
+        "url": "/quality-safety-accreditation/capas",
+        "icon": "FaListCheck"
+      },
+      {
+        "name": "Accreditation Readiness",
+        "url": "/quality-safety-accreditation/accreditation",
+        "icon": "FaCertificate"
+      },
+      {
+        "name": "Infection Control",
+        "url": "/quality-safety-accreditation/infection-control",
+        "icon": "FaVirusCovid"
+      }
+    ]
   },
   {
-    "name": "Safety and Compliance",
-    "url": "/safety-and-compliance",
-    "icon": "FaShieldHalved"
-  },
-  {
-    "name": "Operations",
-    "url": "/operations",
-    "icon": "FaChartLine"
-  },
-  {
-    "name": "Audits",
-    "url": "/audits",
-    "icon": "FaClipboardCheck"
-  },
-  {
-    "name": "Patient Experience",
+    "name": "Patient Experience & Access",
     "url": "/patient-experience",
-    "icon": "FaRegHospital"
+    "icon": "FaRegHospital",
+    "submenu": [
+      {
+        "name": "Surveys",
+        "url": "/patient-experience/surveys",
+        "icon": "FaClipboardList"
+      },
+      {
+        "name": "Complaints",
+        "url": "/patient-experience/complaints",
+        "icon": "FaCommentDots"
+      },
+      {
+        "name": "Wait Time & Patient Flow",
+        "url": "/patient-experience/patient-flow",
+        "icon": "FaClock"
+      }
+    ]
+  },
+  {
+    "name": "Operational Intelligence",
+    "url": "/operations",
+    "icon": "FaChartLine",
+    "submenu": [
+      {
+        "name": "Bed & Capacity",
+        "url": "/operations/bed-capacity",
+        "icon": "FaBed"
+      },
+      {
+        "name": "Workforce",
+        "url": "/operations/workforce",
+        "icon": "FaUsers"
+      },
+      {
+        "name": "Theatre",
+        "url": "/operations/theatre",
+        "icon": "FaHospital"
+      },
+      {
+        "name": "Assets",
+        "url": "/operations/assets",
+        "icon": "FaBoxesStacked"
+      },
+      {
+        "name": "Supply Chain",
+        "url": "/operations/supply-chain",
+        "icon": "FaTruck"
+      }
+    ]
+  },
+  {
+    "name": "Clinical Intelligence",
+    "url": "/clinical-intelligence",
+    "icon": "FaStethoscope",
+    "submenu": [
+      {
+        "name": "Outcomes",
+        "url": "/clinical-intelligence/outcomes",
+        "icon": "FaChartPie"
+      },
+      {
+        "name": "Protocol Adherence",
+        "url": "/clinical-intelligence/protocol-adherence",
+        "icon": "FaClipboardCheck"
+      },
+      {
+        "name": "AI CDS",
+        "url": "/clinical-intelligence/ai-cds",
+        "icon": "FaBrain"
+      },
+      {
+        "name": "Antimicrobial Stewardship",
+        "url": "/clinical-intelligence/antimicrobial-stewardship",
+        "icon": "FaPrescriptionBottleMedical"
+      }
+    ]
+  },
+  {
+    "name": "Financial Intelligence",
+    "url": "/financials",
+    "icon": "FaSackDollar",
+    "submenu": [
+      {
+        "name": "Revenue Cycle Management",
+        "url": "/financials/rcm",
+        "icon": "FaMoneyBillTrendUp"
+      },
+      {
+        "name": "Cost Analytics",
+        "url": "/financials/cost-analytics",
+        "icon": "FaChartColumn"
+      },
+      {
+        "name": "Fraud Detection",
+        "url": "/financials/fraud-detection",
+        "icon": "FaUserSecret"
+      },
+      {
+        "name": "Payer Contracts",
+        "url": "/financials/payer-contracts",
+        "icon": "FaFileSignature"
+      }
+    ]
+  },
+  {
+    "name": "Risk, Audit & Governance",
+    "url": "/risk-audit-governance",
+    "icon": "FaScaleBalanced",
+    "submenu": [
+      {
+        "name": "Internal Audit",
+        "url": "/risk-audit-governance/internal-audit",
+        "icon": "FaClipboardCheck"
+      },
+      {
+        "name": "Risk Register",
+        "url": "/risk-audit-governance/risk-register",
+        "icon": "FaBookOpen"
+      },
+      {
+        "name": "Compliance",
+        "url": "/risk-audit-governance/compliance",
+        "icon": "FaGavel"
+      },
+      {
+        "name": "Evidence Vault",
+        "url": "/risk-audit-governance/evidence-vault",
+        "icon": "FaVault"
+      },
+      {
+        "name": "Forensic",
+        "url": "/risk-audit-governance/forensic",
+        "icon": "FaMagnifyingGlass"
+      },
+      {
+        "name": "AI Control Tower",
+        "url": "/risk-audit-governance/control-tower",
+        "icon": "FaTowerObservation"
+      }
+    ]
   },
   {
     "name": "Settings",
