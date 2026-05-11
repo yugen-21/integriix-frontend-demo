@@ -98,10 +98,14 @@ class PolicyAPIService {
     return http.get(`/v1/policies/${policyId}/audit`);
   }
 
-  // POST /policies/{policy_id}/gaps/{requirement_code}/ai-draft — "Fill with AI"
-  generateGapDraft(policyId, requirementCode) {
+  // POST /policies/{policy_id}/gaps/{requirement_code}/rewrite-docx —
+  // "Fill with AI". Returns the rewritten template as a .docx blob ready
+  // to download.
+  rewriteGapAsDocx(policyId, requirementCode) {
     return http.post(
-      `/v1/policies/${policyId}/gaps/${requirementCode}/ai-draft`
+      `/v1/policies/${policyId}/gaps/${requirementCode}/rewrite-docx`,
+      null,
+      { responseType: "blob" },
     );
   }
 

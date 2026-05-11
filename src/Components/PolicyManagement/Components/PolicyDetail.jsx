@@ -1620,7 +1620,7 @@ function adaptAuditToGapAnalysis(api) {
         code: c.code,
         label: c.label,
         text: c.text,
-        citation: c.citation ?? null,
+        llmReason: c.llm_reason ?? null,
         jciContext: adaptJciContext(c.jci_context),
       })),
       gaps: (jci.gaps ?? []).map((g) => ({
@@ -1628,7 +1628,7 @@ function adaptAuditToGapAnalysis(api) {
         label: g.label,
         text: g.text,
         severity: g.severity,
-        remediation: g.remediation,
+        llmReason: g.llm_reason ?? null,
         recommendedTemplate: g.recommended_template ?? null,
         jciContext: adaptJciContext(g.jci_context),
       })),
@@ -1902,6 +1902,7 @@ function ChecklistTabBody({
             data={data}
             total={total}
             coveragePct={coveragePct}
+            policyId={policy?.id}
             onViewFull={setDetailItem}
           />
         ))}
@@ -1956,7 +1957,14 @@ function SummaryStat({ label, value, tone }) {
   );
 }
 
-function BodyChecklistSection({ body, data, total, coveragePct, onViewFull }) {
+function BodyChecklistSection({
+  body,
+  data,
+  total,
+  coveragePct,
+  policyId,
+  onViewFull,
+}) {
   return (
     <section className="break-inside-avoid rounded-xl border border-slate-200 print:border-slate-300">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2 print:bg-white">
@@ -1987,10 +1995,10 @@ function BodyChecklistSection({ body, data, total, coveragePct, onViewFull }) {
               label={el.label}
               text={el.text}
               meta={formatChapterMeta(el.jciContext)}
-              metaText={el.citation?.excerpt}
+              metaText={el.llmReason}
               status="covered"
               jciContext={el.jciContext}
-              citation={el.citation}
+              policyId={policyId}
               onViewFull={() => onViewFull({ kind: "covered", el })}
             />
           ))}
@@ -2001,12 +2009,13 @@ function BodyChecklistSection({ body, data, total, coveragePct, onViewFull }) {
               code={el.code}
               label={el.label}
               text={el.text}
-              meta={`Gap · ${el.severity}`}
-              metaText={el.remediation}
+              meta={formatChapterMeta(el.jciContext)}
+              metaText={el.llmReason}
               status="gap"
               severity={el.severity}
               recommendedTemplate={el.recommendedTemplate}
               jciContext={el.jciContext}
+              policyId={policyId}
               onViewFull={() => onViewFull({ kind: "gap", el })}
             />
           ))}
@@ -2190,52 +2199,38 @@ function RequirementDetailModal({ item, onClose }) {
 
           <JciContextSection ctx={el.jciContext} />
 
-          {isCovered && el.citation && (
+          {el.llmReason && (
             <section>
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                Matched policy text
+              <p
+                className={`text-[10px] font-semibold uppercase tracking-wide ${
+                  isCovered ? "text-emerald-700" : "text-red-700"
+                }`}
+              >
+                {isCovered ? "AI assessment" : "Why this is a gap"}
               </p>
-              <blockquote className="mt-1 rounded-lg border-l-4 border-emerald-300 bg-emerald-50/50 px-3 py-2 text-xs leading-6 text-slate-700">
-                {el.citation.excerpt || "—"}
-              </blockquote>
-              {el.citation.label &&
-                el.citation.label !== "Matched policy text" && (
-                  <p className="mt-1 text-[10px] text-slate-500">
-                    From section: {el.citation.label}
-                  </p>
-                )}
+              <p className="mt-1 whitespace-pre-wrap text-xs leading-6 text-slate-700">
+                {el.llmReason}
+              </p>
             </section>
           )}
 
-          {!isCovered && (
-            <>
-              <section>
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-red-700">
-                  Suggested remediation
+          {!isCovered && el.recommendedTemplate && (
+            <section>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-cyan-700">
+                Recommended template
+              </p>
+              <p className="mt-1 text-xs text-slate-700">
+                <span className="font-semibold">
+                  {el.recommendedTemplate.code}
+                </span>{" "}
+                — {el.recommendedTemplate.title}
+              </p>
+              {el.recommendedTemplate.filename && (
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  {el.recommendedTemplate.filename}
                 </p>
-                <p className="mt-1 whitespace-pre-wrap text-xs leading-6 text-slate-700">
-                  {el.remediation || "—"}
-                </p>
-              </section>
-              {el.recommendedTemplate && (
-                <section>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-cyan-700">
-                    Recommended template
-                  </p>
-                  <p className="mt-1 text-xs text-slate-700">
-                    <span className="font-semibold">
-                      {el.recommendedTemplate.code}
-                    </span>{" "}
-                    — {el.recommendedTemplate.title}
-                  </p>
-                  {el.recommendedTemplate.filename && (
-                    <p className="mt-0.5 text-[11px] text-slate-500">
-                      {el.recommendedTemplate.filename}
-                    </p>
-                  )}
-                </section>
               )}
-            </>
+            </section>
           )}
         </div>
       </div>
@@ -2254,7 +2249,7 @@ function ChecklistRow({
   severity,
   recommendedTemplate,
   jciContext,
-  citation,
+  policyId,
   onViewFull,
 }) {
   return (
@@ -2314,21 +2309,22 @@ function ChecklistRow({
         )}
         {metaText && (
           <p className="mt-0.5 text-[11px] leading-5 text-slate-600">
-            {status === "covered" ? `"${metaText}"` : metaText}
+            <span className="font-semibold text-slate-700">
+              {status === "covered" ? "AI says: " : "Why it's a gap: "}
+            </span>
+            {metaText}
           </p>
         )}
         {status === "gap" && recommendedTemplate && (
           <TemplateRecommendation
             template={recommendedTemplate}
-            elementCode={code}
-            elementLabel={label}
-            elementText={text}
+            policyId={policyId}
+            requirementCode={code}
           />
         )}
         <ChecklistRowPrintDetails
           status={status}
           jciContext={jciContext}
-          citation={citation}
           recommendedTemplate={recommendedTemplate}
         />
       </div>
@@ -2339,7 +2335,6 @@ function ChecklistRow({
 function ChecklistRowPrintDetails({
   status,
   jciContext,
-  citation,
   recommendedTemplate,
 }) {
   const ctx = jciContext;
@@ -2350,13 +2345,8 @@ function ChecklistRowPrintDetails({
   const hasJci =
     ctx &&
     (hasChapter || hasGoal || ctx.intentText || ctx.rationaleText || hasMEs);
-  const hasCitationLabel =
-    status === "covered" &&
-    citation &&
-    citation.label &&
-    citation.label !== "Matched policy text";
   const hasTemplate = status === "gap" && recommendedTemplate;
-  if (!hasJci && !hasCitationLabel && !hasTemplate) return null;
+  if (!hasJci && !hasTemplate) return null;
   return (
     <div className="hidden print:block mt-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-[11px] leading-5 text-slate-700">
       {hasJci && (
@@ -2413,11 +2403,6 @@ function ChecklistRowPrintDetails({
           )}
         </div>
       )}
-      {hasCitationLabel && (
-        <p className="mt-1 text-[10px] text-slate-500">
-          From section: {citation.label}
-        </p>
-      )}
       {hasTemplate && (
         <div className="mt-2 border-t border-slate-200 pt-1.5">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-cyan-700">
@@ -2439,13 +2424,9 @@ function ChecklistRowPrintDetails({
   );
 }
 
-function TemplateRecommendation({
-  template,
-  elementCode,
-  elementLabel,
-  elementText,
-}) {
+function TemplateRecommendation({ template, policyId, requirementCode }) {
   const [feedback, setFeedback] = useState(null);
+  const [aiBusy, setAiBusy] = useState(false);
 
   function downloadBlob(filename, body) {
     const blob =
@@ -2480,18 +2461,37 @@ function TemplateRecommendation({
     setTimeout(() => setFeedback(null), 3500);
   }
 
-  function handleAiFill() {
-    const filename = template.filename.replace(/\.docx$/, "_AI-filled.docx");
-    downloadBlob(
-      filename,
-      buildAiFilledTemplate(template, {
-        elementCode,
-        elementLabel,
-        elementText,
-      }),
-    );
-    setFeedback(`AI-filled ${template.code} drafted and downloaded.`);
-    setTimeout(() => setFeedback(null), 3500);
+  async function handleAiFill() {
+    if (aiBusy) return;
+    if (policyId == null || !requirementCode) {
+      setFeedback("Cannot run AI fill: missing policy or requirement.");
+      setTimeout(() => setFeedback(null), 3500);
+      return;
+    }
+    setAiBusy(true);
+    setFeedback("Rewriting with AI… this can take 10–30 seconds.");
+    try {
+      const response = await policyAPI.rewriteGapAsDocx(
+        policyId,
+        requirementCode,
+      );
+      const filename = template.filename.replace(
+        /\.docx$/i,
+        "_AI-filled.docx",
+      );
+      downloadBlob(filename, response.data);
+      setFeedback(`AI-filled ${template.code} downloaded.`);
+    } catch (err) {
+      const status = err?.response?.status;
+      let msg = `AI fill failed for ${template.code}.`;
+      if (status === 422) msg = "This gap can't be rewritten (covered or no template).";
+      else if (status === 410) msg = "Template file is missing on the server.";
+      else if (status === 502 || status === 503) msg = "AI service unavailable. Try again.";
+      setFeedback(msg);
+    } finally {
+      setAiBusy(false);
+      setTimeout(() => setFeedback(null), 4500);
+    }
   }
 
   return (
@@ -2522,6 +2522,15 @@ function TemplateRecommendation({
             <FaDownload className="h-2.5 w-2.5" aria-hidden="true" />
             Download template
           </button>
+          <button
+            type="button"
+            onClick={handleAiFill}
+            disabled={aiBusy}
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-cyan-300 bg-cyan-600 px-2 text-[11px] font-semibold text-white hover:bg-cyan-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <FaDownload className="h-2.5 w-2.5" aria-hidden="true" />
+            {aiBusy ? "Filling…" : "Fill with AI"}
+          </button>
         </div>
       </div>
       {feedback && (
@@ -2531,102 +2540,6 @@ function TemplateRecommendation({
       )}
     </div>
   );
-}
-
-function buildTemplateSkeleton({ code, title }) {
-  return [
-    `TITLE: ${title.toUpperCase()}`,
-    `IDENTIFICATION NUMBER: ${code}`,
-    `ORIGINAL DATE: January 2025`,
-    `LAST REVISION DATE: —`,
-    `HOSPITAL(S): XYZ HOSPITAL`,
-    `NEXT REVIEW DATE: January 2028`,
-    ``,
-    `PURPOSE (AIM):`,
-    `To establish standardized procedures, responsibilities, and quality standards for "${title}" at XYZ HOSPITAL, ensuring patient safety, regulatory compliance, operational consistency, and alignment with applicable accreditation standards.`,
-    ``,
-    `DEFINITION:`,
-    `Refer to the hospital glossary of terms; specific definitions for "${title}" shall be inserted by the policy owner where required.`,
-    ``,
-    `APPLIES TO:`,
-    `[ List target staff groups ]`,
-    ``,
-    `PATIENT GROUP:`,
-    `[ Define applicable patient cohort ]`,
-    ``,
-    `EXCEPTIONS:`,
-    `Any exception to this policy shall be documented, justified, and approved by the Department Head and Quality Department.`,
-    ``,
-    `TARGET AREAS:`,
-    `[ List clinical / operational areas ]`,
-    ``,
-    `PROTOCOLS:`,
-    `[ Insert hospital-specific protocols, roles, and responsibilities ]`,
-    ``,
-    `SPECIAL CONSIDERATIONS:`,
-    `[ Insert special considerations ]`,
-    ``,
-    `REFERENCES:`,
-    `[ Insert regulatory and accreditation references ]`,
-    ``,
-    `ATTACHMENTS:`,
-    `[ List attached forms, checklists, and consents ]`,
-  ].join("\n");
-}
-
-function buildAiFilledTemplate(template, element) {
-  return [
-    `TITLE: ${template.title.toUpperCase()}`,
-    `IDENTIFICATION NUMBER: ${template.code}`,
-    `ORIGINAL DATE: January 2025`,
-    `LAST REVISION DATE: —`,
-    `HOSPITAL(S): XYZ HOSPITAL`,
-    `NEXT REVIEW DATE: January 2028`,
-    ``,
-    `— DRAFT GENERATED BY MEDULLAAI —`,
-    `Source gap: ${element.elementCode} · ${element.elementLabel}`,
-    `Requirement text: ${element.elementText}`,
-    ``,
-    `PURPOSE (AIM):`,
-    `To define the standards and accountability framework that bring XYZ Hospital into compliance with ${element.elementCode} (${element.elementLabel}). This policy specifies the controls, roles, and review cadence required to address: ${element.elementText}`,
-    ``,
-    `DEFINITION:`,
-    `Key terms used in this policy follow the definitions in the XYZ Hospital glossary. For the purposes of ${element.elementCode}, the policy adopts the wording of the accreditation element verbatim where applicable.`,
-    ``,
-    `APPLIES TO:`,
-    `All staff whose duties intersect with the scope of ${element.elementCode}, including clinical, allied health, pharmacy, and supervisory personnel as relevant.`,
-    ``,
-    `PATIENT GROUP:`,
-    `All patients within the scope of ${template.title}, irrespective of age, gender, or service line, unless explicitly excluded below.`,
-    ``,
-    `EXCEPTIONS:`,
-    `Documented and time-limited exceptions approved by the Department Head and Quality Department.`,
-    ``,
-    `TARGET AREAS:`,
-    `Inpatient units, outpatient clinics, emergency department, pharmacy, and any unit with workflows touching ${element.elementLabel.toLowerCase()}.`,
-    ``,
-    `PROTOCOLS:`,
-    `1. The Department Head is the policy owner and is accountable for implementation, monitoring, and annual review.`,
-    `2. All affected staff shall be trained at induction and re-trained annually on the requirements of ${element.elementCode}.`,
-    `3. The hospital shall implement the controls described by ${element.elementCode}, with documented evidence retained in the unit's compliance file.`,
-    `4. KPIs aligned to ${element.elementCode} shall be reported quarterly to the Quality Committee.`,
-    `5. Any deviation shall be reported via the incident reporting system within 24 hours.`,
-    ``,
-    `SPECIAL CONSIDERATIONS:`,
-    `Where local regulation imposes a stricter standard than the accreditation element, the stricter standard prevails.`,
-    ``,
-    `REFERENCES:`,
-    `- ${element.elementCode}: ${element.elementLabel}`,
-    `- ${element.elementText}`,
-    `- XYZ Hospital Quality Manual, current edition.`,
-    ``,
-    `ATTACHMENTS:`,
-    `- Compliance checklist for ${element.elementCode}`,
-    `- Training acknowledgement form`,
-    `- KPI monitoring template`,
-    ``,
-    `(This is an AI-generated draft. Hospital subject-matter experts must review, edit, and approve before issue.)`,
-  ].join("\n");
 }
 
 function buildChecklistPdf(
@@ -2774,10 +2687,9 @@ function buildChecklistPdf(
         label: el.label,
         text: el.text,
         meta: formatChapterMeta(el.jciContext) ?? "",
-        metaText: el.citation?.excerpt ?? "",
+        metaText: el.llmReason ?? "",
         severity: "",
         jciContext: el.jciContext,
-        citation: el.citation,
         recommendedTemplate: null,
       })),
       ...data.gaps.map((el) => ({
@@ -2785,11 +2697,10 @@ function buildChecklistPdf(
         code: el.code,
         label: el.label,
         text: el.text,
-        meta: `Gap · ${el.severity}`,
-        metaText: el.remediation ?? "",
+        meta: formatChapterMeta(el.jciContext) ?? "",
+        metaText: el.llmReason ?? "",
         severity: el.severity,
         jciContext: el.jciContext,
-        citation: null,
         recommendedTemplate: el.recommendedTemplate ?? null,
       })),
     ];
@@ -2893,13 +2804,19 @@ function buildChecklistPdf(
       }
       if (it.metaText) {
         drawTextBlock(
-          it.status === "covered" ? `"${it.metaText}"` : it.metaText,
+          it.status === "covered" ? "AI REASONING" : "WHY IT'S A GAP",
           {
-            size: 9,
-            color: [71, 85, 105],
+            size: 7,
+            style: "bold",
+            color: it.status === "covered" ? [4, 120, 87] : [185, 28, 28],
             indent: 18,
           },
         );
+        drawTextBlock(it.metaText, {
+          size: 9,
+          color: [71, 85, 105],
+          indent: 18,
+        });
       }
 
       const ctx = it.jciContext;
@@ -2956,19 +2873,6 @@ function buildChecklistPdf(
             });
           });
         }
-      }
-
-      if (
-        it.status === "covered" &&
-        it.citation &&
-        it.citation.label &&
-        it.citation.label !== "Matched policy text"
-      ) {
-        drawTextBlock(`From section: ${it.citation.label}`, {
-          size: 8,
-          color: [100, 116, 139],
-          indent: 18,
-        });
       }
 
       if (it.status === "gap" && it.recommendedTemplate) {
