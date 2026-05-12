@@ -90,6 +90,21 @@ function adaptApiDetail(api) {
   const currentVersion = versions[0];
 
   const apiBase = import.meta.env.VITE_API_URL;
+
+  const activityItems = (api.activity ?? []).map((entry) => ({
+    id: entry.id,
+    eventType: entry.event_type,
+    at: entry.event_at,
+    actor: entry.actor ?? null,
+    action: describeActivity(entry),
+  }));
+
+  // Computed before versionItems / fileLink so it can serve as the
+  // cache-buster on the PDF URL. Bumps every time activity ticks (new
+  // version upload, status change, etc.) so caches don't serve stale PDFs.
+  const lastActivityAt =
+    activityItems[0]?.at ?? currentVersion?.created_at ?? api.uploaded_at;
+
   const versionItems = versions.map((v) => ({
     id: v.id,
     version: v.version ? `v${v.version}` : "—",
@@ -100,22 +115,13 @@ function adaptApiDetail(api) {
     fileName: basename(v.file_path),
     // api.file_link is a path like "/v1/policies/2/file" — prepend the
     // backend host so download links don't resolve against the Vercel origin.
+    // Same cache-buster as fileLink so the versions-tab "View PDF" link
+    // also bypasses stale caches after a new version is uploaded.
     fileUrl:
       currentVersion && v.id === currentVersion.id && api.file_link
-        ? `${apiBase}${api.file_link}`
+        ? `${apiBase}${api.file_link}?v=${encodeURIComponent(lastActivityAt ?? "")}`
         : null,
   }));
-
-  const activityItems = (api.activity ?? []).map((entry) => ({
-    id: entry.id,
-    eventType: entry.event_type,
-    at: entry.event_at,
-    actor: entry.actor ?? null,
-    action: describeActivity(entry),
-  }));
-
-  const lastActivityAt =
-    activityItems[0]?.at ?? currentVersion?.created_at ?? api.uploaded_at;
 
   // PolicyForm wants `audienceRule` as a known rule id ("all-staff") to
   // preselect the radio. Match the API's free-text audience_rule by label
@@ -149,7 +155,13 @@ function adaptApiDetail(api) {
     accreditationTags: ["JCI"],
     // Backend returns a path like "/v1/policies/2/file"; prepend the API
     // base so iframes/downloads hit the tunnel host, not the Vercel origin.
-    fileLink: api.file_link ? `${apiBase}${api.file_link}` : null,
+    // Append a cache-buster keyed to the latest activity timestamp so that
+    // uploading a new version forces every cache layer (browser, service
+    // worker, Vercel edge, tunnel) to fetch fresh PDF bytes. The backend
+    // ignores the unknown query param.
+    fileLink: api.file_link
+      ? `${apiBase}${api.file_link}?v=${encodeURIComponent(lastActivityAt ?? "")}`
+      : null,
     detail: {
       summary: api.summary ?? "Summary not available yet.",
       appliesTo: api.audience_rule ? [api.audience_rule] : [],
