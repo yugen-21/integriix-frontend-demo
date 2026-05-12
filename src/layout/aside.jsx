@@ -72,7 +72,9 @@ function Aside({ isOpen = false, onClose }) {
           </span>
           <div>
             <p className="text-lg font-bold text-white">MedullaAI</p>
-            <p className="text-sm text-cyan-100/75">A Hospital's Synapse</p>
+            <p className="text-sm text-cyan-100/75">
+              Healthcare’s autonomic intelligence
+            </p>
           </div>
           <button
             className="ml-auto hidden h-10 w-10 place-items-center rounded-xl bg-white/10 text-white transition hover:bg-white/15 max-[900px]:grid"
