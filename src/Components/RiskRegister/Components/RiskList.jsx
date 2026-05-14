@@ -8,7 +8,7 @@ import {
   FaSortUp,
   FaTableCellsLarge,
   FaTableList,
-  // FaWandMagicSparkles — re-import when the Generate button is restored.
+  FaWandMagicSparkles,
 } from "react-icons/fa6";
 import { departments, macroCategories, tiers } from "../../../data";
 import Heatmap from "./Heatmap";
@@ -86,7 +86,7 @@ function SortIcon({ active, dir }) {
   );
 }
 
-function RiskList({ risks, onSelect /*, onGenerate */ }) {
+function RiskList({ risks, onSelect, onGenerate }) {
   const [sort, setSort] = useState({ key: "residualRating", dir: "desc" });
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -356,11 +356,6 @@ function RiskList({ risks, onSelect /*, onGenerate */ }) {
               </button>
             </div>
 
-            {/* Generate button hidden for now — the wizard is built but the
-                product direction is moving toward a single AI-generation path
-                run by the developer, not a self-service onboarding feature.
-                Restore this block (and the matching wizard wiring in
-                ../index.jsx) when that decision changes.
             {onGenerate && (
               <button
                 type="button"
@@ -371,7 +366,6 @@ function RiskList({ risks, onSelect /*, onGenerate */ }) {
                 Generate
               </button>
             )}
-            */}
           </div>
         </div>
 
