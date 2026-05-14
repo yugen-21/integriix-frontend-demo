@@ -43,23 +43,35 @@
       },
       {
         "name": "Search",
-        "url": "/search",
+        "url": "/search-policy-list",
+        "icon": "FaWandMagicSparkles"
+      }
+    ]
+  },
+  {
+    "name": "Risk, Audit & Governance",
+    "url": "/risk-register",
+    "icon": "FaScaleBalanced",
+    "submenu": [
+      {
+        "name": "Risk Register",
+        "url": "/risk-register",
+        "icon": "FaBookOpen"
+      },
+      {
+        "name": "Search",
+        "url": "/search-risk-register",
         "icon": "FaWandMagicSparkles"
       },
       {
-        "name": "Compliance Dashboard",
-        "url": "/compliance",
-        "icon": "FaChartColumn"
+        "name": "Operative Effectiveness",
+        "url": "/operative-effectiveness",
+        "icon": "FaClipboardCheck"
       },
       {
-        "name": "Reviewer Queue",
-        "url": "/reviewer-queue",
-        "icon": "FaListCheck"
-      },
-      {
-        "name": "Overdue Policies",
-        "url": "/overdue",
-        "icon": "FaTriangleExclamation"
+        "name": "Internal Audit",
+        "url": "/internal-audit",
+        "icon": "FaFileCircleCheck"
       }
     ]
   },
@@ -195,43 +207,6 @@
         "name": "Payer Contracts",
         "url": "/financials/payer-contracts",
         "icon": "FaFileSignature"
-      }
-    ]
-  },
-  {
-    "name": "Risk, Audit & Governance",
-    "url": "/risk-audit-governance",
-    "icon": "FaScaleBalanced",
-    "submenu": [
-      {
-        "name": "Internal Audit",
-        "url": "/risk-audit-governance/internal-audit",
-        "icon": "FaClipboardCheck"
-      },
-      {
-        "name": "Risk Register",
-        "url": "/risk-audit-governance/risk-register",
-        "icon": "FaBookOpen"
-      },
-      {
-        "name": "Compliance",
-        "url": "/risk-audit-governance/compliance",
-        "icon": "FaGavel"
-      },
-      {
-        "name": "Evidence Vault",
-        "url": "/risk-audit-governance/evidence-vault",
-        "icon": "FaVault"
-      },
-      {
-        "name": "Forensic",
-        "url": "/risk-audit-governance/forensic",
-        "icon": "FaMagnifyingGlass"
-      },
-      {
-        "name": "AI Control Tower",
-        "url": "/risk-audit-governance/control-tower",
-        "icon": "FaTowerObservation"
       }
     ]
   },

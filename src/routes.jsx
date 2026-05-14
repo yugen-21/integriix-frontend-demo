@@ -6,6 +6,10 @@ import ReviewerQueue from "./Components/ReviewerQueue";
 import OverduePolicies from "./Components/OverduePolicies";
 import ComplianceDashboard from "./Components/ComplianceDashboard";
 import PolicySearch from "./Components/PolicySearch";
+import RiskRegister from "./Components/RiskRegister";
+import RiskSearch from "./Components/RiskSearch";
+import OperativeEffectiveness from "./Components/OperativeEffectiveness";
+import InternalAudit from "./Components/InternalAudit";
 
 const builtRoutes = [
   { path: "/", element: <DailyBrief /> },
@@ -13,7 +17,17 @@ const builtRoutes = [
   { path: "/reviewer-queue", element: <ReviewerQueue /> },
   { path: "/overdue", element: <OverduePolicies /> },
   { path: "/compliance", element: <ComplianceDashboard /> },
-  { path: "/search", element: <PolicySearch /> },
+  { path: "/search-policy-list", element: <PolicySearch /> },
+  { path: "/risk-register", element: <RiskRegister /> },
+  { path: "/search-risk-register", element: <RiskSearch /> },
+  {
+    path: "/operative-effectiveness",
+    element: <OperativeEffectiveness />,
+  },
+  {
+    path: "/internal-audit",
+    element: <InternalAudit />,
+  },
 ];
 
 const builtPaths = new Set(builtRoutes.map((r) => r.path));
