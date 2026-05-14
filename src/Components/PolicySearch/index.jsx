@@ -20,7 +20,9 @@ function readQueryFromUrl() {
 
 function navigateToSearch(query) {
   const trimmed = (query ?? "").trim();
-  const url = trimmed ? `/search?q=${encodeURIComponent(trimmed)}` : "/search";
+  const url = trimmed
+    ? `/search-policy-list?q=${encodeURIComponent(trimmed)}`
+    : "/search-policy-list";
   window.location.assign(url);
 }
 
