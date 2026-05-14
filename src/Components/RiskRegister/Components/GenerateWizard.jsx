@@ -8,7 +8,7 @@ import {
 } from "react-icons/fa6";
 import { departments, macroCategories } from "../../../data";
 
-const ACCREDITATIONS = ["NABH", "NABL", "JCI", "ISO 9001", "General"];
+const ACCREDITATIONS = ["JCI", "NABL", "JCI", "ISO 9001", "General"];
 
 const TIER_SCOPES = [
   { value: "operational", label: "Operational only" },
@@ -23,7 +23,8 @@ const TEMPLATES = {
     {
       tier: "Operational",
       category: "Patient Safety",
-      title: (d) => `Patient misidentification during ${d.toLowerCase()} workflows`,
+      title: (d) =>
+        `Patient misidentification during ${d.toLowerCase()} workflows`,
       description: (d) =>
         `Risk of misidentifying patients during ${d.toLowerCase()} interventions, potentially leading to wrong-patient procedures.`,
       context:
@@ -162,8 +163,7 @@ const TEMPLATES = {
       controlDescription:
         "Three-way match (PO/GRN/invoice); supervisor approval threshold.",
       controlAttributes: ["Preventive", "Manual", "Per-event"],
-      mitigationPlan:
-        "Automate three-way match with ERP integration.",
+      mitigationPlan: "Automate three-way match with ERP integration.",
       mitigationOwner: "Finance + IT",
       mitigationTimeline: "Q1 2027",
     },
@@ -357,7 +357,7 @@ function GenerateWizard({ onCancel, onAccept, existingRiskCount }) {
   const [step, setStep] = useState("configure");
   const [macroCategory, setMacroCategory] = useState("");
   const [selectedDepartments, setSelectedDepartments] = useState([]);
-  const [accreditation, setAccreditation] = useState("NABH");
+  const [accreditation, setAccreditation] = useState("JCI");
   const [tierScope, setTierScope] = useState("operational+process");
   const [proposals, setProposals] = useState([]);
   const [includedIds, setIncludedIds] = useState(() => new Set());
@@ -696,7 +696,10 @@ function GeneratingCard() {
     <section className="relative min-w-0 overflow-hidden rounded-3xl border border-white/80 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.08)] max-[520px]:rounded-2xl">
       <div className="grid place-items-center gap-3 p-12">
         <span className="grid h-12 w-12 place-items-center rounded-full bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200">
-          <FaWandMagicSparkles className="h-5 w-5 animate-pulse" aria-hidden="true" />
+          <FaWandMagicSparkles
+            className="h-5 w-5 animate-pulse"
+            aria-hidden="true"
+          />
         </span>
         <p className="text-sm font-semibold text-slate-900">
           Drafting your risk register…
@@ -795,7 +798,9 @@ function ReviewCard({
                   key={r.id}
                   onClick={() => toggleInclude(r.id)}
                   className={`cursor-pointer transition ${
-                    included ? "hover:bg-slate-50/60" : "opacity-50 hover:opacity-75"
+                    included
+                      ? "hover:bg-slate-50/60"
+                      : "opacity-50 hover:opacity-75"
                   }`}
                 >
                   <td className="px-4 py-3">
