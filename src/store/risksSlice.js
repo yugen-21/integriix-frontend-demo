@@ -1,8 +1,123 @@
-import { createSlice } from "@reduxjs/toolkit";
-import { mockRisks } from "../data/mockRisks";
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import riskAPI from "../services/riskAPI";
+
+// The API returns enum *values* (lowercase, e.g. "operational",
+// "process_level"). The existing UI hardcodes display strings like
+// "Operational" / "Process-Level" / "Strategic" — so we normalize on the way
+// in and de-normalize on the way out so the rest of the components don't
+// need to know.
+const TIER_FROM_API = {
+  operational: "Operational",
+  process_level: "Process-Level",
+  strategic: "Strategic",
+};
+const TIER_TO_API = {
+  Operational: "operational",
+  "Process-Level": "process_level",
+  Strategic: "strategic",
+};
+
+function normalizeRisk(risk) {
+  if (!risk) return risk;
+  return {
+    ...risk,
+    tier: TIER_FROM_API[risk.tier] ?? risk.tier,
+  };
+}
+
+function denormalizePatch(patch) {
+  const out = { ...patch };
+  if (out.tier && TIER_TO_API[out.tier]) out.tier = TIER_TO_API[out.tier];
+  return out;
+}
+
+// ---------- Async thunks (real backend) ----------
+
+export const fetchRisks = createAsyncThunk(
+  "risks/fetchRisks",
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      // Pull a large page so the existing client-side filtering / sorting
+      // / pagination in <RiskList /> keeps working unchanged.
+      const res = await riskAPI.listRisks({ limit: 500, offset: 0, ...params });
+      return (res.data.items ?? []).map(normalizeRisk);
+    } catch (err) {
+      return rejectWithValue(err?.response?.data?.detail ?? err.message);
+    }
+  },
+);
+
+export const fetchDepartments = createAsyncThunk(
+  "risks/fetchDepartments",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await riskAPI.listDepartments();
+      return res.data.items ?? [];
+    } catch (err) {
+      return rejectWithValue(err?.response?.data?.detail ?? err.message);
+    }
+  },
+);
+
+export const createRiskThunk = createAsyncThunk(
+  "risks/createRisk",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const res = await riskAPI.createRisk(denormalizePatch(payload));
+      return normalizeRisk(res.data);
+    } catch (err) {
+      return rejectWithValue(err?.response?.data?.detail ?? err.message);
+    }
+  },
+);
+
+export const updateRiskThunk = createAsyncThunk(
+  "risks/updateRisk",
+  async ({ id, patch }, { rejectWithValue }) => {
+    try {
+      const res = await riskAPI.updateRisk(id, denormalizePatch(patch));
+      return normalizeRisk(res.data);
+    } catch (err) {
+      return rejectWithValue(err?.response?.data?.detail ?? err.message);
+    }
+  },
+);
+
+export const deleteRiskThunk = createAsyncThunk(
+  "risks/deleteRisk",
+  async (id, { rejectWithValue }) => {
+    try {
+      await riskAPI.deleteRisk(id);
+      return id;
+    } catch (err) {
+      return rejectWithValue(err?.response?.data?.detail ?? err.message);
+    }
+  },
+);
+
+export const searchRisksThunk = createAsyncThunk(
+  "risks/searchRisks",
+  async ({ q, limit = 10, minScore = 0.5 } = {}, { rejectWithValue }) => {
+    try {
+      const res = await riskAPI.searchRisks(q, { limit, minScore });
+      // Items already include matchScore + matchedChunk. Normalize tier so
+      // the same display strings as the rest of the UI work here too.
+      const items = (res.data.items ?? []).map(normalizeRisk);
+      return { query: res.data.query, items, total: res.data.total };
+    } catch (err) {
+      return rejectWithValue(err?.response?.data?.detail ?? err.message);
+    }
+  },
+);
+
+// ---------- Slice ----------
 
 const initialState = {
-  items: mockRisks,
+  items: [],
+  departments: [],
+  loading: false,
+  error: null,
+  mutating: false, // true while create / update / delete is in flight
   filters: {
     macroCategory: null,
     department: null,
@@ -15,6 +130,12 @@ const initialState = {
   view: "table", // "table" | "heatmap"
   heatmapMode: "residual", // "inherent" | "residual"
   selectedRiskId: null,
+  // Semantic search state — separate from `items` so submitting a query
+  // doesn't clobber the unfiltered register the user can return to.
+  searchQuery: "",
+  searchResults: [],
+  searchLoading: false,
+  searchError: null,
 };
 
 const risksSlice = createSlice({
@@ -40,24 +161,88 @@ const risksSlice = createSlice({
     clearSelectedRisk: (state) => {
       state.selectedRiskId = null;
     },
-    updateRisk: (state, action) => {
-      const updated = action.payload;
-      const idx = state.items.findIndex((r) => r.id === updated.id);
-      if (idx !== -1) {
-        const merged = { ...state.items[idx], ...updated };
-        merged.inherentRating = merged.likelihood * merged.impact;
-        merged.residualRating = merged.inherentRating * merged.controlEffectiveness;
-        state.items[idx] = merged;
-      }
+    clearSearch: (state) => {
+      state.searchQuery = "";
+      state.searchResults = [];
+      state.searchLoading = false;
+      state.searchError = null;
     },
-    addRisks: (state, action) => {
-      const incoming = action.payload ?? [];
-      for (const risk of incoming) {
-        risk.inherentRating = risk.likelihood * risk.impact;
-        risk.residualRating = risk.inherentRating * risk.controlEffectiveness;
-        state.items.push(risk);
-      }
-    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchRisks.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchRisks.fulfilled, (state, action) => {
+        state.loading = false;
+        state.items = action.payload;
+      })
+      .addCase(fetchRisks.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload ?? "Failed to load risks";
+      })
+      .addCase(fetchDepartments.fulfilled, (state, action) => {
+        state.departments = action.payload;
+      })
+      .addCase(createRiskThunk.pending, (state) => {
+        state.mutating = true;
+        state.error = null;
+      })
+      .addCase(createRiskThunk.fulfilled, (state, action) => {
+        state.mutating = false;
+        state.items.unshift(action.payload);
+      })
+      .addCase(createRiskThunk.rejected, (state, action) => {
+        state.mutating = false;
+        state.error = action.payload ?? "Failed to create risk";
+      })
+      .addCase(updateRiskThunk.pending, (state) => {
+        state.mutating = true;
+        state.error = null;
+      })
+      .addCase(updateRiskThunk.fulfilled, (state, action) => {
+        state.mutating = false;
+        const updated = action.payload;
+        const idx = state.items.findIndex((r) => r.id === updated.id);
+        if (idx !== -1) state.items[idx] = updated;
+      })
+      .addCase(updateRiskThunk.rejected, (state, action) => {
+        state.mutating = false;
+        state.error = action.payload ?? "Failed to update risk";
+      })
+      .addCase(deleteRiskThunk.pending, (state) => {
+        state.mutating = true;
+        state.error = null;
+      })
+      .addCase(deleteRiskThunk.fulfilled, (state, action) => {
+        state.mutating = false;
+        state.items = state.items.filter((r) => r.id !== action.payload);
+        if (state.selectedRiskId === action.payload) {
+          state.selectedRiskId = null;
+        }
+      })
+      .addCase(deleteRiskThunk.rejected, (state, action) => {
+        state.mutating = false;
+        state.error = action.payload ?? "Failed to delete risk";
+      })
+      .addCase(searchRisksThunk.pending, (state, action) => {
+        state.searchLoading = true;
+        state.searchError = null;
+        // Track the query the user submitted (not the API response one) so
+        // the UI can render "searching for X…" even before results return.
+        state.searchQuery = action.meta.arg?.q ?? "";
+      })
+      .addCase(searchRisksThunk.fulfilled, (state, action) => {
+        state.searchLoading = false;
+        state.searchResults = action.payload.items;
+        state.searchQuery = action.payload.query;
+      })
+      .addCase(searchRisksThunk.rejected, (state, action) => {
+        state.searchLoading = false;
+        state.searchError = action.payload ?? "Search failed";
+        state.searchResults = [];
+      });
   },
 });
 
@@ -68,8 +253,7 @@ export const {
   setHeatmapMode,
   selectRisk,
   clearSelectedRisk,
-  updateRisk,
-  addRisks,
+  clearSearch,
 } = risksSlice.actions;
 
 export default risksSlice.reducer;

@@ -3,12 +3,14 @@ import {
   FaBookOpen,
   FaFilter,
   FaMagnifyingGlass,
+  FaPlus,
   FaSort,
   FaSortDown,
   FaSortUp,
   FaTableCellsLarge,
   FaTableList,
-  FaWandMagicSparkles,
+  FaTrash,
+  // FaWandMagicSparkles, // Generate button disabled — no backend endpoint
 } from "react-icons/fa6";
 import { departments, macroCategories, tiers } from "../../../data";
 import Heatmap from "./Heatmap";
@@ -68,6 +70,7 @@ const COLUMNS = [
   { key: "controlEffectiveness", label: "Control Eff.", align: "center" },
   { key: "residualRating", label: "Residual", align: "center" },
   { key: "mitigationOwner", label: "Mitigation Owner", align: "left" },
+  { key: "_actions", label: "", align: "center", sortable: false },
 ];
 
 function compare(a, b, key) {
@@ -86,7 +89,7 @@ function SortIcon({ active, dir }) {
   );
 }
 
-function RiskList({ risks, onSelect, onGenerate }) {
+function RiskList({ risks, loading, error, onSelect, onCreate, onDelete }) {
   const [sort, setSort] = useState({ key: "residualRating", dir: "desc" });
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -230,6 +233,17 @@ function RiskList({ risks, onSelect, onGenerate }) {
         departments={departmentsCovered}
       />
 
+      {error && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          {String(error)}
+        </div>
+      )}
+      {loading && (
+        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
+          Loading risks…
+        </div>
+      )}
+
       <section className="relative min-w-0 overflow-hidden rounded-3xl border border-white/80 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.08)] max-[520px]:rounded-2xl">
         <div className="border-b border-slate-100 p-4 max-[520px]:p-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -356,6 +370,20 @@ function RiskList({ risks, onSelect, onGenerate }) {
               </button>
             </div>
 
+            {onCreate && (
+              <button
+                type="button"
+                onClick={onCreate}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-cyan-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-cyan-700"
+              >
+                <FaPlus className="h-3 w-3" aria-hidden="true" />
+                Create risk
+              </button>
+            )}
+
+            {/* AI "Generate" button removed — no backend endpoint for AI risk
+                generation. Re-enable once POST /v1/risks/generate exists. */}
+            {/*
             {onGenerate && (
               <button
                 type="button"
@@ -366,6 +394,7 @@ function RiskList({ risks, onSelect, onGenerate }) {
                 Generate
               </button>
             )}
+            */}
           </div>
         </div>
 
@@ -382,25 +411,36 @@ function RiskList({ risks, onSelect, onGenerate }) {
           <table className="w-full min-w-[1180px] border-collapse text-left text-xs">
             <thead className="bg-slate-50/70 text-[10px] font-medium uppercase tracking-wide text-slate-500">
               <tr>
-                {COLUMNS.map((col) => (
-                  <th
-                    key={col.key}
-                    className={`px-4 py-2.5 ${
-                      col.align === "center" ? "text-center" : "text-left"
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggleSort(col.key)}
-                      className={`inline-flex items-center gap-1 transition hover:text-slate-700 ${
-                        col.align === "center" ? "mx-auto" : ""
+                {COLUMNS.map((col) =>
+                  col.sortable === false ? (
+                    <th
+                      key={col.key}
+                      className={`px-4 py-2.5 ${
+                        col.align === "center" ? "text-center" : "text-left"
                       }`}
                     >
                       {col.label}
-                      <SortIcon active={sort.key === col.key} dir={sort.dir} />
-                    </button>
-                  </th>
-                ))}
+                    </th>
+                  ) : (
+                    <th
+                      key={col.key}
+                      className={`px-4 py-2.5 ${
+                        col.align === "center" ? "text-center" : "text-left"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleSort(col.key)}
+                        className={`inline-flex items-center gap-1 transition hover:text-slate-700 ${
+                          col.align === "center" ? "mx-auto" : ""
+                        }`}
+                      >
+                        {col.label}
+                        <SortIcon active={sort.key === col.key} dir={sort.dir} />
+                      </button>
+                    </th>
+                  ),
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -428,7 +468,12 @@ function RiskList({ risks, onSelect, onGenerate }) {
                 </tr>
               ) : (
                 pageItems.map((risk) => (
-                  <RiskRow key={risk.id} risk={risk} onSelect={onSelect} />
+                  <RiskRow
+                    key={risk.id}
+                    risk={risk}
+                    onSelect={onSelect}
+                    onDelete={onDelete}
+                  />
                 ))
               )}
             </tbody>
@@ -542,7 +587,7 @@ function RiskHeader({ total, operational, processLevel, strategic, departments }
   );
 }
 
-function RiskRow({ risk, onSelect }) {
+function RiskRow({ risk, onSelect, onDelete }) {
   const isStrategic = risk.tier === "Strategic";
   const ctrl = controlEffectiveness[risk.controlEffectiveness];
 
@@ -555,6 +600,11 @@ function RiskRow({ risk, onSelect }) {
       event.preventDefault();
       onSelect?.(risk.id);
     }
+  }
+
+  function handleDeleteClick(event) {
+    event.stopPropagation();
+    onDelete?.(risk.id);
   }
 
   return (
@@ -637,6 +687,19 @@ function RiskRow({ risk, onSelect }) {
       </td>
       <td className="px-4 py-3">
         <p className="text-xs text-slate-700">{risk.mitigationOwner}</p>
+      </td>
+      <td className="px-4 py-3 text-center">
+        {onDelete && (
+          <button
+            type="button"
+            onClick={handleDeleteClick}
+            title="Delete risk"
+            aria-label={`Delete ${risk.riskNumber}`}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+          >
+            <FaTrash className="h-3 w-3" aria-hidden="true" />
+          </button>
+        )}
       </td>
     </tr>
   );

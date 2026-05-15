@@ -1,14 +1,21 @@
-import { useMemo, useState } from "react";
-import { useSelector } from "react-redux";
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import {
   FaArrowRight,
   FaMagnifyingGlass,
   FaQuoteLeft,
+  FaSpinner,
   FaWandMagicSparkles,
   FaXmark,
 } from "react-icons/fa6";
+import {
+  clearSearch,
+  fetchRisks,
+  searchRisksThunk,
+} from "../../store/risksSlice";
 
 const SEARCH_LIMIT = 20;
+const MIN_SCORE = 0.5;
 
 function readQueryFromUrl() {
   if (typeof window === "undefined") return "";
@@ -16,17 +23,20 @@ function readQueryFromUrl() {
   return params.get("q") ?? "";
 }
 
-function navigateToSearch(query) {
+// Update the URL without a full page reload — keeps the deep-link pattern
+// `?q=...` working but avoids re-hydrating Redux + re-running every effect.
+function pushQueryToUrl(query) {
+  if (typeof window === "undefined") return;
   const trimmed = (query ?? "").trim();
   const url = trimmed
     ? `/search-risk-register?q=${encodeURIComponent(trimmed)}`
     : "/search-risk-register";
-  window.location.assign(url);
+  window.history.pushState({}, "", url);
 }
 
 function navigateToRisk(id) {
   window.location.assign(
-    `/risk-audit-governance/risk-register?risk=${encodeURIComponent(id)}`,
+    `/risk-register?risk=${encodeURIComponent(id)}`,
   );
 }
 
@@ -46,39 +56,10 @@ function tokenize(text) {
     .filter((t) => t.length > 1 && !STOPWORDS.has(t));
 }
 
-// Token-overlap scoring across weighted fields. Lightweight stand-in for a real
-// semantic search until the backend is wired up.
-function scoreRisk(risk, queryTokens) {
-  if (queryTokens.length === 0) return 0;
-
-  const fields = [
-    { text: risk.title, weight: 4 },
-    { text: risk.description, weight: 2 },
-    { text: risk.category, weight: 2 },
-    { text: risk.department, weight: 2 },
-    { text: risk.owner, weight: 1.5 },
-    { text: risk.context, weight: 1 },
-    { text: risk.controlDescription, weight: 1 },
-    { text: risk.mitigationPlan, weight: 1 },
-  ];
-
-  let total = 0;
-  for (const field of fields) {
-    const haystack = tokenize(field.text);
-    if (haystack.length === 0) continue;
-    const haystackSet = new Set(haystack);
-    let hits = 0;
-    for (const token of queryTokens) {
-      if (haystackSet.has(token)) hits += 1;
-      else if (haystack.some((h) => h.startsWith(token) || token.startsWith(h)))
-        hits += 0.5;
-    }
-    total += (hits / queryTokens.length) * field.weight;
-  }
-  // Normalise to roughly 0..1 — total weight sum is ~14.5.
-  return Math.min(1, total / 8);
-}
-
+// Snippet picking + highlight helpers — kept from the old implementation
+// because they only use the query string to highlight lexically matching
+// words. Useful even with semantic search: if the user typed "barcode" and
+// the result mentions "barcode" we still want to point that out.
 function pickSnippet(text, queryTokens, maxLen = 240) {
   if (!text) return null;
   if (queryTokens.length === 0)
@@ -137,6 +118,18 @@ function inherentBandClass(value) {
   return "bg-rose-50 text-rose-700 ring-rose-200";
 }
 
+const MATCHED_CHUNK_LABEL = {
+  risk_body: "Risk body",
+  controls: "Controls",
+  mitigation: "Mitigation",
+};
+
+const MATCHED_CHUNK_TONE = {
+  risk_body: "bg-cyan-50 text-cyan-700 ring-cyan-200",
+  controls: "bg-indigo-50 text-indigo-700 ring-indigo-200",
+  mitigation: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+};
+
 const SUGGESTED_QUERIES = [
   "patient identification",
   "transfusion mismatch",
@@ -149,21 +142,47 @@ const SUGGESTED_QUERIES = [
 ];
 
 function RiskSearch() {
-  const risks = useSelector((state) => state.risks.items);
-  const initialQuery = useMemo(() => readQueryFromUrl(), []);
-  const [draft, setDraft] = useState(initialQuery);
+  const dispatch = useDispatch();
 
-  const queryTokens = useMemo(() => tokenize(initialQuery), [initialQuery]);
+  const risks = useSelector((s) => s.risks.items);
+  const results = useSelector((s) => s.risks.searchResults);
+  const loading = useSelector((s) => s.risks.searchLoading);
+  const error = useSelector((s) => s.risks.searchError);
+  const submittedQuery = useSelector((s) => s.risks.searchQuery);
 
-  const results = useMemo(() => {
-    if (queryTokens.length === 0) return [];
-    const scored = risks
-      .map((risk) => ({ risk, score: scoreRisk(risk, queryTokens) }))
-      .filter((entry) => entry.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, SEARCH_LIMIT);
-    return scored;
-  }, [risks, queryTokens]);
+  const [draft, setDraft] = useState(() => readQueryFromUrl());
+
+  // 1) Load risks once so the IdleState's "top residual" widget has data
+  //    even if the user landed here directly.
+  useEffect(() => {
+    if (risks.length === 0) dispatch(fetchRisks());
+  }, [dispatch, risks.length]);
+
+  // 2) If the URL has ?q=…, fire the search on mount (and whenever the URL
+  //    query changes via back/forward navigation).
+  useEffect(() => {
+    const fromUrl = readQueryFromUrl();
+    if (fromUrl) {
+      setDraft(fromUrl);
+      dispatch(searchRisksThunk({ q: fromUrl, limit: SEARCH_LIMIT, minScore: MIN_SCORE }));
+    } else {
+      dispatch(clearSearch());
+    }
+
+    function onPopState() {
+      const q = readQueryFromUrl();
+      setDraft(q);
+      if (q) {
+        dispatch(searchRisksThunk({ q, limit: SEARCH_LIMIT, minScore: MIN_SCORE }));
+      } else {
+        dispatch(clearSearch());
+      }
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [dispatch]);
+
+  const queryTokens = useMemo(() => tokenize(submittedQuery), [submittedQuery]);
 
   const topResidualRisks = useMemo(() => {
     return [...risks]
@@ -171,10 +190,27 @@ function RiskSearch() {
       .slice(0, 5);
   }, [risks]);
 
+  function runSearch(q) {
+    const trimmed = (q ?? "").trim();
+    pushQueryToUrl(trimmed);
+    if (trimmed) {
+      dispatch(searchRisksThunk({ q: trimmed, limit: SEARCH_LIMIT, minScore: MIN_SCORE }));
+    } else {
+      dispatch(clearSearch());
+    }
+  }
+
   function handleSubmit(event) {
     event.preventDefault();
-    navigateToSearch(draft);
+    runSearch(draft);
   }
+
+  function handleClear() {
+    setDraft("");
+    runSearch("");
+  }
+
+  const hasSubmittedQuery = Boolean(submittedQuery);
 
   return (
     <div className="grid min-w-0 gap-5 max-[900px]:gap-4">
@@ -182,22 +218,37 @@ function RiskSearch() {
 
       <SearchBar
         draft={draft}
+        loading={loading}
         onChange={setDraft}
         onSubmit={handleSubmit}
-        onClear={() => navigateToSearch("")}
-        hasQuery={Boolean(initialQuery)}
+        onClear={handleClear}
       />
 
-      {!initialQuery && (
-        <IdleState topRisks={topResidualRisks} totalRisks={risks.length} />
+      {error && (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+          {String(error)}
+        </div>
       )}
-      {initialQuery && results.length === 0 && (
-        <NoResults query={initialQuery} />
+
+      {!hasSubmittedQuery && !loading && (
+        <IdleState
+          totalRisks={risks.length}
+          topRisks={topResidualRisks}
+          onPick={(q) => {
+            setDraft(q);
+            runSearch(q);
+          }}
+        />
       )}
-      {initialQuery && results.length > 0 && (
+
+      {hasSubmittedQuery && !loading && results.length === 0 && !error && (
+        <NoResults query={submittedQuery} />
+      )}
+
+      {hasSubmittedQuery && results.length > 0 && (
         <ResultsView
           results={results}
-          query={initialQuery}
+          query={submittedQuery}
           queryTokens={queryTokens}
         />
       )}
@@ -225,15 +276,16 @@ function Header() {
           Find the right risk, fast
         </h1>
         <p className="text-xs text-slate-500">
-          Search across every operational, process-level and strategic risk —
-          by title, description, control, owner or department.
+          Semantic search across every risk — matches the question against the
+          risk body, controls and mitigation. Only results above{" "}
+          {Math.round(MIN_SCORE * 100)}% similarity are shown.
         </p>
       </div>
     </section>
   );
 }
 
-function SearchBar({ draft, onChange, onSubmit, onClear, hasQuery }) {
+function SearchBar({ draft, loading, onChange, onSubmit, onClear }) {
   return (
     <form
       onSubmit={onSubmit}
@@ -247,7 +299,7 @@ function SearchBar({ draft, onChange, onSubmit, onClear, hasQuery }) {
             aria-hidden="true"
           />
           <input
-            type="search"
+            type="text"
             value={draft}
             onChange={(e) => onChange(e.target.value)}
             placeholder="e.g. patient identification errors in ICU"
@@ -257,9 +309,10 @@ function SearchBar({ draft, onChange, onSubmit, onClear, hasQuery }) {
           {draft && (
             <button
               type="button"
-              onClick={() => onChange("")}
+              onClick={onClear}
               className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-              aria-label="Clear input"
+              aria-label="Clear search"
+              title="Clear search"
             >
               <FaXmark className="h-3 w-3" aria-hidden="true" />
             </button>
@@ -267,26 +320,27 @@ function SearchBar({ draft, onChange, onSubmit, onClear, hasQuery }) {
         </label>
         <button
           type="submit"
-          className="inline-flex h-11 items-center gap-1.5 rounded-2xl bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800"
+          disabled={loading}
+          className="inline-flex h-11 items-center gap-1.5 rounded-2xl bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Search
-          <FaArrowRight className="h-3 w-3" aria-hidden="true" />
+          {loading ? (
+            <>
+              <FaSpinner className="h-3 w-3 animate-spin" aria-hidden="true" />
+              Searching
+            </>
+          ) : (
+            <>
+              Search
+              <FaArrowRight className="h-3 w-3" aria-hidden="true" />
+            </>
+          )}
         </button>
-        {hasQuery && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="hidden h-11 items-center rounded-2xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50 sm:inline-flex"
-          >
-            Reset
-          </button>
-        )}
       </div>
     </form>
   );
 }
 
-function IdleState({ topRisks, totalRisks }) {
+function IdleState({ topRisks, totalRisks, onPick }) {
   return (
     <div className="grid gap-5">
       <section className="grid gap-4 rounded-3xl border border-white/80 bg-white p-6 shadow-[0_18px_45px_rgba(15,23,42,0.06)] max-[520px]:rounded-2xl max-[520px]:p-4">
@@ -300,7 +354,7 @@ function IdleState({ topRisks, totalRisks }) {
             </p>
             <p className="mt-1 text-xs text-slate-500">
               Searching across {totalRisks} risk{totalRisks === 1 ? "" : "s"} —
-              by title, description, controls, owner or department.
+              semantic match against risk body, controls and mitigation.
             </p>
           </div>
         </div>
@@ -310,7 +364,7 @@ function IdleState({ topRisks, totalRisks }) {
             <button
               key={q}
               type="button"
-              onClick={() => navigateToSearch(q)}
+              onClick={() => onPick(q)}
               className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-cyan-50 hover:text-cyan-700"
             >
               <FaMagnifyingGlass className="h-2.5 w-2.5" aria-hidden="true" />
@@ -332,7 +386,8 @@ function IdleState({ topRisks, totalRisks }) {
             <ResultCard
               key={risk.id}
               risk={risk}
-              score={null}
+              matchScore={null}
+              matchedChunk={null}
               rank={idx + 1}
               queryTokens={[]}
             />
@@ -350,12 +405,11 @@ function NoResults({ query }) {
         <FaMagnifyingGlass className="h-4 w-4" aria-hidden="true" />
       </span>
       <p className="text-sm font-semibold text-slate-700">
-        No risks matched “{query}”
+        No strong matches above {Math.round(MIN_SCORE * 100)}% for “{query}”
       </p>
       <p className="mx-auto max-w-md text-xs text-slate-500">
-        Try a different phrasing, or seed more risks via{" "}
-        <span className="font-medium text-slate-700">Generate register</span> on
-        the main list.
+        Try rewording your question — the search compares meaning, not just
+        keywords. Or browse the full register.
       </p>
     </section>
   );
@@ -370,11 +424,12 @@ function ResultsView({ results, query, queryTokens }) {
       </p>
 
       <ol className="grid gap-3">
-        {results.map((entry, idx) => (
+        {results.map((hit, idx) => (
           <ResultCard
-            key={entry.risk.id}
-            risk={entry.risk}
-            score={entry.score}
+            key={hit.id}
+            risk={hit}
+            matchScore={hit.matchScore}
+            matchedChunk={hit.matchedChunk}
             rank={idx + 1}
             queryTokens={queryTokens}
           />
@@ -384,9 +439,23 @@ function ResultsView({ results, query, queryTokens }) {
   );
 }
 
-function ResultCard({ risk, score, rank, queryTokens }) {
+function ResultCard({ risk, matchScore, matchedChunk, rank, queryTokens }) {
   const titleParts = highlightTokens(risk.title, queryTokens);
-  const snippetText = pickSnippet(risk.description, queryTokens);
+  // Pull the snippet from whichever field the backend says matched — that's
+  // the one most likely to contain the user's intent.
+  const snippetSource =
+    matchedChunk === "controls"
+      ? risk.controlDescription
+      : matchedChunk === "mitigation"
+        ? risk.mitigationPlan
+        : risk.description;
+  const snippetLabel =
+    matchedChunk === "controls"
+      ? "Controls"
+      : matchedChunk === "mitigation"
+        ? "Mitigation plan"
+        : "Description";
+  const snippetText = pickSnippet(snippetSource, queryTokens);
   const snippetParts = snippetText ? highlightTokens(snippetText, queryTokens) : null;
 
   return (
@@ -418,6 +487,16 @@ function ResultCard({ risk, score, rank, queryTokens }) {
               <span className="rounded bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 ring-1 ring-slate-200">
                 {risk.category}
               </span>
+              {matchedChunk && (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ${
+                    MATCHED_CHUNK_TONE[matchedChunk] ?? MATCHED_CHUNK_TONE.risk_body
+                  }`}
+                  title={`Matched in the ${(MATCHED_CHUNK_LABEL[matchedChunk] ?? matchedChunk).toLowerCase()} of this risk`}
+                >
+                  Matched in: {MATCHED_CHUNK_LABEL[matchedChunk] ?? matchedChunk}
+                </span>
+              )}
             </div>
 
             <h3 className="mt-2 text-sm font-semibold leading-snug text-slate-900 group-hover:text-cyan-700">
@@ -442,7 +521,7 @@ function ResultCard({ risk, score, rank, queryTokens }) {
           </div>
 
           <div className="flex flex-col items-end gap-2">
-            {score != null && <ScorePill score={score} />}
+            {matchScore != null && <ScorePill score={matchScore} />}
             <RatingPills risk={risk} />
           </div>
         </div>
@@ -451,7 +530,7 @@ function ResultCard({ risk, score, rank, queryTokens }) {
           <div className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
             <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
               <FaQuoteLeft className="h-2.5 w-2.5" aria-hidden="true" />
-              Description
+              {snippetLabel}
             </p>
             <p className="mt-2 text-xs leading-5 text-slate-700">
               {snippetParts.map((part) =>
@@ -506,17 +585,17 @@ function ScorePill({ score }) {
   const numeric = Number(score) || 0;
   const pct = Math.round(numeric * 100);
   const tone =
-    numeric >= 0.6
+    numeric >= 0.75
       ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-      : numeric >= 0.3
-        ? "bg-cyan-50 text-cyan-700 ring-cyan-200"
-        : "bg-slate-100 text-slate-700 ring-slate-200";
+      : numeric >= 0.6
+        ? "bg-amber-50 text-amber-700 ring-amber-200"
+        : "bg-cyan-50 text-cyan-700 ring-cyan-200";
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ${tone}`}
+      title={`${pct}% cosine similarity`}
     >
-      {numeric.toFixed(2)}
-      <span className="text-[10px] font-medium opacity-70">({pct}%)</span>
+      {pct}% match
     </span>
   );
 }

@@ -6,6 +6,7 @@ import {
   FaCircleCheck,
   FaCircleExclamation,
   FaPenToSquare,
+  FaTrash,
   FaXmark,
 } from "react-icons/fa6";
 
@@ -36,7 +37,7 @@ function residualBandClass(value) {
 // The parent passes `key={risk.id}` so this component remounts when the
 // selected risk changes — that's why `useState(risk)` here can safely act as
 // the source of truth without a reset effect.
-function RiskDetail({ risk, onBack, onUpdate }) {
+function RiskDetail({ risk, mutating, onBack, onUpdate, onDelete }) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(risk);
 
@@ -53,8 +54,10 @@ function RiskDetail({ risk, onBack, onUpdate }) {
     setDraft((prev) => ({ ...prev, ...partial }));
   }
 
-  function save() {
-    onUpdate?.({ ...draft, inherentRating: inherent, residualRating: residual });
+  async function save() {
+    // The slice strips server-managed fields (inherentRating, residualRating,
+    // department, macroCategory, etc.) before sending.
+    await onUpdate?.(draft);
     setIsEditing(false);
   }
 
@@ -82,7 +85,8 @@ function RiskDetail({ risk, onBack, onUpdate }) {
               <button
                 type="button"
                 onClick={cancel}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+                disabled={mutating}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
               >
                 <FaXmark className="h-3 w-3" aria-hidden="true" />
                 Cancel
@@ -90,21 +94,35 @@ function RiskDetail({ risk, onBack, onUpdate }) {
               <button
                 type="button"
                 onClick={save}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800"
+                disabled={mutating}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <FaCircleCheck className="h-3 w-3" aria-hidden="true" />
-                Save changes
+                {mutating ? "Saving…" : "Save changes"}
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              onClick={() => setIsEditing(true)}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-            >
-              <FaPenToSquare className="h-3 w-3" aria-hidden="true" />
-              Edit
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                <FaPenToSquare className="h-3 w-3" aria-hidden="true" />
+                Edit
+              </button>
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  disabled={mutating}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
+                >
+                  <FaTrash className="h-3 w-3" aria-hidden="true" />
+                  Delete
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
