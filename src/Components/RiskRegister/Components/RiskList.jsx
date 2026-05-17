@@ -5,6 +5,7 @@ import {
   FaMagnifyingGlass,
   FaPlus,
   FaSort,
+  FaSpinner,
   FaSortDown,
   FaSortUp,
   FaTableCellsLarge,
@@ -468,6 +469,17 @@ function RiskList({ risks, loading, error, onSelect, onCreate, onDelete }) {
               {pageItems.length === 0 ? (
                 <tr>
                   <td colSpan={COLUMNS.length} className="px-4 py-12 text-center">
+                    {loading ? (
+                      <div className="grid place-items-center gap-2 text-slate-500">
+                        <FaSpinner
+                          className="h-5 w-5 animate-spin text-cyan-600"
+                          aria-hidden="true"
+                        />
+                        <p className="text-sm font-medium text-slate-600">
+                          Retrieving risks…
+                        </p>
+                      </div>
+                    ) : (
                     <div className="grid place-items-center gap-2 text-slate-400">
                       <FaFilter className="h-5 w-5" aria-hidden="true" />
                       <p className="text-sm font-medium text-slate-600">
@@ -485,6 +497,7 @@ function RiskList({ risks, loading, error, onSelect, onCreate, onDelete }) {
                         </button>
                       )}
                     </div>
+                    )}
                   </td>
                 </tr>
               ) : (

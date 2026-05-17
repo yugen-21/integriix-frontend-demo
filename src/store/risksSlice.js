@@ -128,7 +128,10 @@ export const fetchControllingPolicies = createAsyncThunk(
 const initialState = {
   items: [],
   departments: [],
-  loading: false,
+  // Start true: RiskRegister always dispatches fetchRisks() on mount, so
+  // the first render is a load — not an empty register. Prevents a flash
+  // of "No risks to display" before the thunk's pending action fires.
+  loading: true,
   error: null,
   mutating: false, // true while create / update / delete is in flight
   filters: {

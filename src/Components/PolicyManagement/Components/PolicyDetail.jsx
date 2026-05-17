@@ -728,6 +728,21 @@ function RisksTab({ policy }) {
     );
   }
 
+  // Only declare "no risks" once the fetch has actually succeeded for
+  // THIS policy. Until then keep the spinner up — an empty list during a
+  // policy switch or in-flight fetch is "not loaded yet", not "none".
+  if (status !== "succeeded") {
+    return (
+      <div className="grid place-items-center gap-2 px-4 py-12 text-center">
+        <FaSpinner
+          className="h-5 w-5 animate-spin text-cyan-600"
+          aria-hidden="true"
+        />
+        <p className="text-xs text-slate-500">Loading linked risks…</p>
+      </div>
+    );
+  }
+
   if (risks.length === 0) {
     return (
       <div className="grid place-items-center gap-2 px-4 py-12 text-center">

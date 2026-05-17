@@ -415,19 +415,24 @@ const policiesSlice = createSlice({
       })
       .addCase(fetchControlledRisks.pending, (state, action) => {
         const incomingId = action.meta.arg;
-        if (
+        const isPolicySwitch =
           state.controlledRisksPolicyId != null &&
-          state.controlledRisksPolicyId !== incomingId
-        ) {
+          state.controlledRisksPolicyId !== incomingId;
+        if (isPolicySwitch) {
           state.controlledRisks = [];
         }
         state.controlledRisksPolicyId = incomingId;
         state.controlledRisksError = null;
-        // Don't flicker to 'loading' on background polls once we're
-        // already pending or have data — only spinner on first load.
+        // On a policy switch (or first load) show the spinner. We must
+        // force 'loading' here even if the previous policy had status
+        // 'succeeded' — otherwise the now-cleared (empty) risks list
+        // renders the "no risks controlled" empty state for a frame.
+        // Only suppress the spinner for background polls of the SAME
+        // policy that are already pending or already have data.
         if (
-          state.controlledRisksStatus !== "pending" &&
-          state.controlledRisksStatus !== "succeeded"
+          isPolicySwitch ||
+          (state.controlledRisksStatus !== "pending" &&
+            state.controlledRisksStatus !== "succeeded")
         ) {
           state.controlledRisksStatus = "loading";
         }
