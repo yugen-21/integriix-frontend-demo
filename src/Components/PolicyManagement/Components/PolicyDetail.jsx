@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import {
   changeStatus,
   fetchAudit,
+  fetchControlledRisks,
   fetchPolicyById,
   fetchPolicyVersions,
   runAudit,
@@ -29,6 +30,7 @@ import {
   FaRegLightbulb,
   FaRegSquare,
   FaRobot,
+  FaShieldHalved,
   FaSpinner,
   FaSquareCheck,
   FaTags,
@@ -70,6 +72,7 @@ const TABS = [
   { id: "overview", label: "Overview", Icon: FaFileLines },
   { id: "versions", label: "Versions", Icon: FaClockRotateLeft },
   { id: "checklist", label: "Checklist", Icon: FaSquareCheck },
+  { id: "risks", label: "Risks", Icon: FaShieldHalved },
   // { id: "ai", label: "AI", Icon: FaWandMagicSparkles },
   { id: "activity", label: "Activity", Icon: FaListCheck },
 ];
@@ -381,6 +384,7 @@ function PolicyDetail({
             )}
             {activeTab === "acks" && <AcknowledgementsTab policy={policy} />}
             {activeTab === "checklist" && <ChecklistTab policy={policy} />}
+            {activeTab === "risks" && <RisksTab policy={policy} />}
             {/* AI tab is hidden — backend has no regenerate-insights endpoint
                 and the data (summary + key_clauses) is already shown in the
                 Overview tab. Re-enable the TABS entry above to bring it back. */}
@@ -639,6 +643,166 @@ function SidePanel({
   );
 }
 
+function residualBand(rating) {
+  if (rating == null) return "bg-slate-100 text-slate-600 ring-slate-200";
+  if (rating <= 8) return "bg-emerald-50 text-emerald-700 ring-emerald-200";
+  if (rating <= 24) return "bg-amber-50 text-amber-700 ring-amber-200";
+  return "bg-rose-50 text-rose-700 ring-rose-200";
+}
+
+// "Risks controlled by this policy". The links are produced by a
+// background job after upload, so a freshly-uploaded policy returns
+// `pending: true` from the API — we show a spinner and poll every 5s,
+// mirroring the OverviewTab / ChecklistTab pattern.
+function RisksTab({ policy }) {
+  const dispatch = useDispatch();
+  const status = useSelector((s) => s.policies.controlledRisksStatus);
+  const linkedPolicyId = useSelector(
+    (s) => s.policies.controlledRisksPolicyId,
+  );
+  const risks = useSelector((s) => s.policies.controlledRisks);
+  const error = useSelector((s) => s.policies.controlledRisksError);
+
+  // Fetch on mount / when the open policy changes.
+  useEffect(() => {
+    if (policy?.id != null) dispatch(fetchControlledRisks(policy.id));
+  }, [dispatch, policy?.id]);
+
+  // Poll while the background linker is still computing for this policy.
+  useEffect(() => {
+    if (status !== "pending" || policy?.id == null) return undefined;
+    const intervalId = setInterval(() => {
+      dispatch(fetchControlledRisks(policy.id));
+    }, 5000);
+    return () => clearInterval(intervalId);
+  }, [dispatch, status, policy?.id]);
+
+  // Ignore data that belongs to a previously-open policy mid-switch.
+  const ready = linkedPolicyId === policy?.id;
+  const isFirstLoad = !ready || status === "loading" || status === "idle";
+
+  if (status === "pending") {
+    return (
+      <div className="grid place-items-center gap-2 px-4 py-12 text-center">
+        <FaSpinner
+          className="h-5 w-5 animate-spin text-cyan-600"
+          aria-hidden="true"
+        />
+        <p className="text-sm font-medium text-slate-700">
+          Working out which risks this policy controls…
+        </p>
+        <p className="text-xs text-slate-500">
+          The AI is matching this policy against the risk register. This
+          usually takes 30–60 seconds — we'll refresh automatically.
+        </p>
+      </div>
+    );
+  }
+
+  if (isFirstLoad) {
+    return (
+      <div className="grid place-items-center gap-2 px-4 py-12 text-center">
+        <FaSpinner
+          className="h-5 w-5 animate-spin text-cyan-600"
+          aria-hidden="true"
+        />
+        <p className="text-xs text-slate-500">Loading linked risks…</p>
+      </div>
+    );
+  }
+
+  if (status === "failed") {
+    return (
+      <div className="grid place-items-center gap-2 px-4 py-12 text-center">
+        <FaCircleXmark
+          className="h-5 w-5 text-rose-500"
+          aria-hidden="true"
+        />
+        <p className="text-sm font-medium text-slate-700">
+          Couldn't load linked risks
+        </p>
+        <p className="text-xs text-slate-500">
+          {error?.message ?? "Please try again."}
+        </p>
+      </div>
+    );
+  }
+
+  if (risks.length === 0) {
+    return (
+      <div className="grid place-items-center gap-2 px-4 py-12 text-center">
+        <FaShieldHalved
+          className="h-5 w-5 text-slate-400"
+          aria-hidden="true"
+        />
+        <p className="text-sm font-medium text-slate-700">
+          No risks controlled by this policy
+        </p>
+        <p className="text-xs text-slate-500">
+          The AI didn't find a risk in the register whose control this
+          policy enforces.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-2">
+      <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+        {risks.length} risk{risks.length === 1 ? "" : "s"} controlled by this
+        policy
+      </p>
+      {risks.map((r) => (
+        <button
+          key={r.risk_id}
+          type="button"
+          onClick={() =>
+            window.location.assign(
+              `/risk-register?risk=${encodeURIComponent(r.risk_id)}`,
+            )
+          }
+          title="Open risk detail"
+          className="w-full rounded-2xl border border-slate-100 bg-white p-4 text-left ring-1 ring-slate-100 transition hover:border-cyan-200 hover:ring-cyan-200"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="flex items-center gap-2 text-xs font-semibold text-slate-800">
+                <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600">
+                  {r.risk_number}
+                </span>
+                <span className="truncate">{r.title}</span>
+              </p>
+              <p className="mt-1 text-[11px] text-slate-500">
+                {r.department ?? "—"} · {r.tier}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ${residualBand(
+                  r.residual_rating,
+                )}`}
+                title="Residual rating"
+              >
+                Residual {r.residual_rating}
+              </span>
+              <span
+                className="rounded-full bg-cyan-50 px-2 py-0.5 text-[10px] font-medium text-cyan-700 ring-1 ring-cyan-200"
+                title="Cosine match score"
+              >
+                {Math.round((r.match_score ?? 0) * 100)}% match
+              </span>
+              <FaArrowRight
+                className="h-3 w-3 text-slate-400"
+                aria-hidden="true"
+              />
+            </div>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function OverviewTab({ policy }) {
   const dispatch = useDispatch();
   const summary = policy.detail.summary;
@@ -735,29 +899,155 @@ function OverviewTab({ policy }) {
   );
 }
 
+// Keyed by policy id + fileLink so it remounts (state resets to
+// "loading") whenever the document changes — keeps all setState inside
+// async callbacks, never synchronously in an effect.
+function DocxDocument({ policyId }) {
+  // "loading" | "ready" | "error"
+  const [status, setStatus] = useState("loading");
+  const [html, setHtml] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    policyAPI
+      .downloadPolicyFile(policyId)
+      .then(async (res) => {
+        if (cancelled) return;
+        const buf = await res.data.arrayBuffer();
+        if (cancelled) return;
+        // mammoth converts the .docx to clean semantic HTML we fully style
+        // ourselves — no fixed page box to overflow. Lazy-imported so it
+        // only enters the bundle when a .docx policy is actually viewed.
+        const mammoth = (await import("mammoth/mammoth.browser")).default;
+        const { value } = await mammoth.convertToHtml({ arrayBuffer: buf });
+        if (cancelled) return;
+        setHtml(value);
+        setStatus("ready");
+      })
+      .catch(() => {
+        if (!cancelled) setStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [policyId]);
+
+  return (
+    <div className="relative h-[600px] w-full overflow-y-auto overflow-x-hidden bg-white">
+      <style>{DOCX_VIEW_CSS}</style>
+      {status === "loading" && (
+        <div className="grid h-full place-items-center text-xs text-slate-500">
+          Loading document…
+        </div>
+      )}
+      {status === "error" && (
+        <div className="grid h-full place-items-center text-xs text-red-600">
+          Couldn't render this document.
+        </div>
+      )}
+      {status === "ready" && (
+        <div
+          className="docx-view mx-auto max-w-3xl px-6 py-6"
+          // mammoth output is derived from a trusted, server-stored .docx
+          // belonging to this tenant; rendered read-only for preview.
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Readable typography for mammoth's flowing HTML. Scoped under .docx-view.
+const DOCX_VIEW_CSS = `
+.docx-view { color: #1e293b; font-size: 13px; line-height: 1.7; }
+.docx-view h1 { font-size: 20px; font-weight: 700; margin: 1.2em 0 .5em; }
+.docx-view h2 { font-size: 16px; font-weight: 700; margin: 1.1em 0 .4em; }
+.docx-view h3 { font-size: 14px; font-weight: 600; margin: 1em 0 .35em; }
+.docx-view p { margin: 0 0 .7em; }
+.docx-view ul, .docx-view ol { margin: 0 0 .8em; padding-left: 1.4em; }
+.docx-view li { margin: .2em 0; }
+.docx-view table { width: 100%; border-collapse: collapse; margin: .8em 0; }
+.docx-view th, .docx-view td {
+  border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; vertical-align: top;
+}
+.docx-view th { background: #f1f5f9; font-weight: 600; }
+.docx-view img { max-width: 100%; height: auto; }
+.docx-view a { color: #0e7490; text-decoration: underline; }
+`;
+
 function PdfPreview({ policy }) {
+  const versions = policy.detail?.versions ?? [];
+  const currentVersion =
+    versions.find((v) => v.isCurrent) ?? versions[0] ?? null;
+  const isDocx = /\.docx$/i.test(currentVersion?.fileName ?? "");
+  const label = isDocx ? "current document" : "current PDF";
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownload() {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const res = await policyAPI.downloadPolicyFile(policy.id);
+      const filename =
+        currentVersion?.fileName ||
+        `${policy.code || "policy"} ${policy.version || ""}`.trim() + ".docx";
+      const url = URL.createObjectURL(res.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
     <div className="rounded-2xl border border-slate-100 bg-white">
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
         <p className="inline-flex items-center gap-2 text-[11px] font-semibold text-slate-700">
           <FaFile className="h-3 w-3 text-slate-400" aria-hidden="true" />
-          {policy.code} {policy.version} · current PDF
+          {policy.code} {policy.version} · {label}
         </p>
-        <span className="text-[10px] text-slate-500">
-          Uploaded {formatDate(policy.lastUpdated)}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-[10px] text-slate-500">
+            Uploaded {formatDate(policy.lastUpdated)}
+          </span>
+          {isDocx && policy.fileLink && (
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={downloading}
+              className="inline-flex h-7 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-[10px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {downloading ? (
+                <FaSpinner className="h-2.5 w-2.5 animate-spin" aria-hidden="true" />
+              ) : (
+                <FaDownload className="h-2.5 w-2.5" aria-hidden="true" />
+              )}
+              Download
+            </button>
+          )}
+        </div>
       </div>
       <div className="bg-slate-50/40">
-        {policy.fileLink ? (
+        {!policy.fileLink ? (
+          <div className="grid h-[200px] place-items-center text-xs text-slate-500">
+            No file available for this policy.
+          </div>
+        ) : isDocx ? (
+          <DocxDocument
+            key={`${policy.id}:${policy.fileLink}`}
+            policyId={policy.id}
+          />
+        ) : (
           <iframe
             src={policy.fileLink}
             title={`${policy.code} current PDF`}
             className="h-[600px] w-full"
           />
-        ) : (
-          <div className="grid h-[200px] place-items-center text-xs text-slate-500">
-            No file available for this policy.
-          </div>
         )}
       </div>
     </div>
@@ -1721,6 +2011,27 @@ function ChecklistTab({ policy }) {
             The process usually takes 30–60 seconds. We'll refresh
             automatically.
           </p>
+        </div>
+      );
+    }
+    if (auditStatus === "errored") {
+      return (
+        <div className="grid place-items-center gap-3 px-4 py-12 text-center">
+          <p className="text-sm font-medium text-red-700">
+            The audit couldn&apos;t be generated
+          </p>
+          <p className="max-w-md text-xs text-slate-600">
+            {auditError?.message ??
+              "Something went wrong while running the audit."}
+          </p>
+          <button
+            type="button"
+            onClick={handleRerun}
+            disabled={auditStatus === "loading"}
+            className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+          >
+            Re-run audit
+          </button>
         </div>
       );
     }

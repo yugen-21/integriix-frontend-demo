@@ -98,6 +98,8 @@ function RiskList({ risks, loading, error, onSelect, onCreate, onDelete }) {
   const [tierFilter, setTierFilter] = useState("All");
   const [residualBandFilter, setResidualBandFilter] = useState("All");
   const [ownerFilter, setOwnerFilter] = useState("All");
+  // "All" | "linked" (has a controlling policy) | "unlinked" (governance gap)
+  const [policyLinkFilter, setPolicyLinkFilter] = useState("All");
   const [view, setView] = useState("table");
   const [heatmapMode, setHeatmapMode] = useState("residual");
 
@@ -123,6 +125,9 @@ function RiskList({ risks, loading, error, onSelect, onCreate, onDelete }) {
         return false;
       if (tierFilter !== "All" && risk.tier !== tierFilter) return false;
       if (ownerFilter !== "All" && risk.owner !== ownerFilter) return false;
+      if (policyLinkFilter === "linked" && !risk.hasLinkedPolicy) return false;
+      if (policyLinkFilter === "unlinked" && risk.hasLinkedPolicy)
+        return false;
       if (
         residualBandFilter !== "All" &&
         !matchesResidualBand(risk.residualRating, residualBandFilter)
@@ -151,6 +156,7 @@ function RiskList({ risks, loading, error, onSelect, onCreate, onDelete }) {
     tierFilter,
     residualBandFilter,
     ownerFilter,
+    policyLinkFilter,
   ]);
 
   const sorted = useMemo(() => {
@@ -173,6 +179,7 @@ function RiskList({ risks, loading, error, onSelect, onCreate, onDelete }) {
   const processCount = risks.filter((r) => r.tier === "Process-Level").length;
   const strategicCount = risks.filter((r) => r.tier === "Strategic").length;
   const departmentsCovered = new Set(risks.map((r) => r.department)).size;
+  const policyControlled = risks.filter((r) => r.hasLinkedPolicy).length;
 
   const hasActiveFilters =
     Boolean(search) ||
@@ -180,7 +187,8 @@ function RiskList({ risks, loading, error, onSelect, onCreate, onDelete }) {
     departmentFilter !== "All" ||
     tierFilter !== "All" ||
     residualBandFilter !== "All" ||
-    ownerFilter !== "All";
+    ownerFilter !== "All" ||
+    policyLinkFilter !== "All";
 
   function toggleSort(key) {
     setSort((prev) =>
@@ -220,6 +228,7 @@ function RiskList({ risks, loading, error, onSelect, onCreate, onDelete }) {
     setTierFilter("All");
     setResidualBandFilter("All");
     setOwnerFilter("All");
+    setPolicyLinkFilter("All");
     setPage(1);
   }
 
@@ -231,6 +240,7 @@ function RiskList({ risks, loading, error, onSelect, onCreate, onDelete }) {
         processLevel={processCount}
         strategic={strategicCount}
         departments={departmentsCovered}
+        policyControlled={policyControlled}
       />
 
       {error && (
@@ -324,6 +334,17 @@ function RiskList({ risks, loading, error, onSelect, onCreate, onDelete }) {
                   {owner}
                 </option>
               ))}
+            </select>
+
+            <select
+              value={policyLinkFilter}
+              onChange={(e) => update(setPolicyLinkFilter)(e.target.value)}
+              title="Filter by whether a policy controls the risk"
+              className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
+            >
+              <option value="All">All policy coverage</option>
+              <option value="linked">Has a controlling policy</option>
+              <option value="unlinked">No controlling policy (gap)</option>
             </select>
 
             {hasActiveFilters && (
@@ -531,12 +552,24 @@ function RiskList({ risks, loading, error, onSelect, onCreate, onDelete }) {
   );
 }
 
-function RiskHeader({ total, operational, processLevel, strategic, departments }) {
+function RiskHeader({
+  total,
+  operational,
+  processLevel,
+  strategic,
+  departments,
+  policyControlled,
+}) {
   const stats = [
     { label: "Total risks", value: total, accent: "text-slate-900" },
     { label: "Operational", value: operational, accent: "text-slate-900" },
     { label: "Process-Level", value: processLevel, accent: "text-indigo-700" },
     { label: "Departments", value: departments, accent: "text-cyan-700" },
+    {
+      label: "Policy-controlled",
+      value: policyControlled,
+      accent: "text-emerald-700",
+    },
   ];
 
   return (
@@ -564,7 +597,7 @@ function RiskHeader({ total, operational, processLevel, strategic, departments }
             strategic risks — including {strategic} escalated to corporate.
           </p>
 
-          <dl className="mt-4 grid max-w-2xl grid-cols-2 gap-3 sm:grid-cols-4">
+          <dl className="mt-4 grid max-w-3xl grid-cols-2 gap-3 sm:grid-cols-5">
             {stats.map((stat) => (
               <div
                 key={stat.label}

@@ -9,6 +9,7 @@ import {
   FaMagnifyingGlass,
   FaPlus,
   FaTriangleExclamation,
+  FaWandMagicSparkles,
 } from "react-icons/fa6";
 import { policyCategories, policyStatuses } from "../../../data";
 
@@ -44,7 +45,14 @@ function daysUntil(dateValue) {
   return Math.round(diffMs / (1000 * 60 * 60 * 24));
 }
 
-function PolicyList({ policies, onSelect, onCreate, onEdit, onDelete }) {
+function PolicyList({
+  policies,
+  onSelect,
+  onCreate,
+  onGenerate,
+  onEdit,
+  onDelete,
+}) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All");
@@ -194,6 +202,15 @@ function PolicyList({ policies, onSelect, onCreate, onEdit, onDelete }) {
             <span className="ml-auto text-[11px] text-slate-500">
               {filteredPolicies.length} of {policies.length} policies
             </span>
+
+            <button
+              type="button"
+              onClick={onGenerate}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-cyan-200 bg-cyan-50 px-3 text-xs font-semibold text-cyan-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-cyan-100"
+            >
+              <FaWandMagicSparkles className="h-3 w-3" aria-hidden="true" />
+              Generate policy
+            </button>
 
             <button
               type="button"

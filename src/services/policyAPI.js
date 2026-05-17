@@ -22,6 +22,25 @@ class PolicyAPIService {
     return http.post("/v1/policies", payload);
   }
 
+  // ---------- 1b. Generate Policy ----------
+
+  // GET /templates — catalog for the Generate wizard: { items, folders, total }
+  listTemplates(params = {}) {
+    return http.get("/v1/templates", { params });
+  }
+
+  // POST /policies/generate — generate (not persisted) a JCI-grounded
+  // policy from a template. Returns generated_text, suggested_code, etc.
+  generatePolicy(payload) {
+    return http.post("/v1/policies/generate", payload);
+  }
+
+  // POST /policies/generate/save — commit the edited generated policy.
+  // Returns the created policy (same shape as createPolicy).
+  saveGeneratedPolicy(payload) {
+    return http.post("/v1/policies/generate/save", payload);
+  }
+
   // ---------- 2. Discovery ----------
 
   // GET /policies — paginated list with filters / sort / search
@@ -37,6 +56,13 @@ class PolicyAPIService {
   // GET /policies/{policy_id} — full detail
   getPolicy(policyId) {
     return http.get(`/v1/policies/${policyId}`);
+  }
+
+  // GET /policies/{policy_id}/risks — risks this policy controls.
+  // Response carries `pending: true` while the background linker is still
+  // computing links for a freshly-uploaded policy.
+  getControlledRisks(policyId) {
+    return http.get(`/v1/policies/${policyId}/risks`);
   }
 
   // ---------- 3. Edit ----------

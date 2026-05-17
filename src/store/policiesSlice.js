@@ -67,6 +67,28 @@ export const fetchAudit = createAsyncThunk(
   }
 );
 
+// GET /v1/policies/{id}/risks — risks this policy controls.
+// `pending: true` from the backend means the background linker hasn't
+// finished for a freshly-uploaded policy — the UI shows a spinner and
+// polls, exactly like the audit pattern above.
+export const fetchControlledRisks = createAsyncThunk(
+  "policies/fetchControlledRisks",
+  async (policyId, { rejectWithValue }) => {
+    try {
+      const res = await policyAPI.getControlledRisks(policyId);
+      return {
+        policyId,
+        items: res.data.items ?? [],
+        pending: Boolean(res.data.pending),
+      };
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data ?? { message: err.message ?? "Request failed" }
+      );
+    }
+  }
+);
+
 // DELETE /v1/policies/{id} — soft-delete. Idempotent (200 with
 // `was_already_deleted: true` on a second call). Optional actor/reason go
 // as query params.
@@ -245,6 +267,13 @@ const initialState = {
   auditStatus: "idle",
   auditError: null,
 
+  controlledRisks: [],
+  controlledRisksPolicyId: null,
+  // 'idle' | 'loading' | 'pending' | 'succeeded' | 'failed'
+  // 'pending' = background linker still computing for this policy — poll.
+  controlledRisksStatus: "idle",
+  controlledRisksError: null,
+
   editStatus: "idle",
   editError: null,
 
@@ -288,6 +317,10 @@ const policiesSlice = createSlice({
       state.auditPolicyId = null;
       state.auditStatus = "idle";
       state.auditError = null;
+      state.controlledRisks = [];
+      state.controlledRisksPolicyId = null;
+      state.controlledRisksStatus = "idle";
+      state.controlledRisksError = null;
       state.editStatus = "idle";
       state.editError = null;
       state.statusChangeStatus = "idle";
@@ -359,17 +392,60 @@ const policiesSlice = createSlice({
       })
       .addCase(fetchAudit.fulfilled, (state, action) => {
         state.auditPolicyId = action.payload.policyId;
+        const auditData = action.payload.data;
         if (action.payload.pending) {
           state.auditStatus = "pending";
           state.audit = null;
+        } else if (auditData?.failed) {
+          // The background audit run errored server-side. Stop polling and
+          // let the UI offer a re-run instead of a forever spinner.
+          state.auditStatus = "errored";
+          state.audit = null;
+          state.auditError = {
+            message: auditData.error || "The audit run failed.",
+          };
         } else {
           state.auditStatus = "succeeded";
-          state.audit = action.payload.data;
+          state.audit = auditData;
         }
       })
       .addCase(fetchAudit.rejected, (state, action) => {
         state.auditStatus = "failed";
         state.auditError = action.payload ?? { message: "Request failed" };
+      })
+      .addCase(fetchControlledRisks.pending, (state, action) => {
+        const incomingId = action.meta.arg;
+        if (
+          state.controlledRisksPolicyId != null &&
+          state.controlledRisksPolicyId !== incomingId
+        ) {
+          state.controlledRisks = [];
+        }
+        state.controlledRisksPolicyId = incomingId;
+        state.controlledRisksError = null;
+        // Don't flicker to 'loading' on background polls once we're
+        // already pending or have data — only spinner on first load.
+        if (
+          state.controlledRisksStatus !== "pending" &&
+          state.controlledRisksStatus !== "succeeded"
+        ) {
+          state.controlledRisksStatus = "loading";
+        }
+      })
+      .addCase(fetchControlledRisks.fulfilled, (state, action) => {
+        state.controlledRisksPolicyId = action.payload.policyId;
+        if (action.payload.pending) {
+          state.controlledRisksStatus = "pending";
+          state.controlledRisks = [];
+        } else {
+          state.controlledRisksStatus = "succeeded";
+          state.controlledRisks = action.payload.items;
+        }
+      })
+      .addCase(fetchControlledRisks.rejected, (state, action) => {
+        state.controlledRisksStatus = "failed";
+        state.controlledRisksError =
+          action.payload ?? { message: "Request failed" };
       })
       .addCase(runAudit.pending, (state, action) => {
         state.auditPolicyId = action.meta.arg;

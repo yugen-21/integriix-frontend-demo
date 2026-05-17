@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import PolicyList from "./Components/PolicyList";
 import PolicyDetail from "./Components/PolicyDetail";
 import PolicyForm from "./Components/PolicyForm";
+import GeneratePolicyWizard from "./Components/GeneratePolicyWizard";
 import { audienceRules, mockPolicies } from "../../data";
 import {
   createPolicy,
@@ -212,6 +213,7 @@ function PolicyManagement() {
   });
   const [initialDetailTab, setInitialDetailTab] = useState("overview");
   const [formState, setFormState] = useState(null);
+  const [generateOpen, setGenerateOpen] = useState(false);
 
   // Fetch the deep-linked policy on mount. Separate effect so it only fires
   // when an ID was actually provided in the URL.
@@ -313,6 +315,25 @@ function PolicyManagement() {
 
   function closeForm() {
     setFormState(null);
+  }
+
+  function openGenerate() {
+    setGenerateOpen(true);
+  }
+
+  function closeGenerate() {
+    setGenerateOpen(false);
+  }
+
+  // The wizard saved the generated policy (POST /generate/save returns the
+  // created policy). Mirror the upload-create flow: close, refresh the
+  // list, and drop into the new policy's detail page.
+  function handleGenerated(created) {
+    setGenerateOpen(false);
+    dispatch(fetchPolicies());
+    if (created?.id != null) {
+      handleSelectPolicy(created.id);
+    }
   }
 
   function nextPolicyId() {
@@ -459,8 +480,16 @@ function PolicyManagement() {
           policies={displayPolicies}
           onSelect={handleSelectPolicy}
           onCreate={openCreate}
+          onGenerate={openGenerate}
           onEdit={openEdit}
           onDelete={handleDeletePolicy}
+        />
+      )}
+
+      {generateOpen && (
+        <GeneratePolicyWizard
+          onClose={closeGenerate}
+          onGenerated={handleGenerated}
         />
       )}
 

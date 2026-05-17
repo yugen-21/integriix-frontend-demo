@@ -51,6 +51,11 @@ class RiskAPIService {
       params: { department_id: departmentId, tier },
     });
   }
+
+  // GET /v1/risks/{id}/policies — policies that control this risk.
+  getControllingPolicies(riskId) {
+    return http.get(`/v1/risks/${riskId}/policies`);
+  }
 }
 
 export default new RiskAPIService();

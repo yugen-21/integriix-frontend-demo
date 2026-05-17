@@ -1,14 +1,17 @@
-import { useMemo, useState } from "react";
-import { useSelector } from "react-redux";
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import {
   FaArrowLeft,
   FaArrowRight,
   FaCircleCheck,
   FaCircleExclamation,
+  FaCircleXmark,
   FaPenToSquare,
+  FaSpinner,
   FaTrash,
   FaXmark,
 } from "react-icons/fa6";
+import { fetchControllingPolicies } from "../../../store/risksSlice";
 
 const tierStyles = {
   Operational: "bg-slate-100 text-slate-700 ring-slate-200",
@@ -337,22 +340,20 @@ function RiskDetail({ risk, mutating, onBack, onUpdate, onDelete }) {
       </Card>
 
       <Card title="Linked references">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <ReferenceTile
-            heading="Linked policies"
-            body="Will populate from the Operative Effectiveness module."
-            tone="cyan"
-          />
-          <ReferenceTile
-            heading="Linked incidents"
-            body="Will populate from Quality, Safety & Accreditation → Incidents."
-            tone="amber"
-          />
-          <ReferenceTile
-            heading="Audit history"
-            body="Will populate from Internal Audit."
-            tone="indigo"
-          />
+        <div className="grid gap-3">
+          <LinkedPolicies riskId={risk.id} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ReferenceTile
+              heading="Linked incidents"
+              body="Will populate from Quality, Safety & Accreditation → Incidents."
+              tone="amber"
+            />
+            <ReferenceTile
+              heading="Audit history"
+              body="Will populate from Internal Audit."
+              tone="indigo"
+            />
+          </div>
         </div>
       </Card>
     </div>
@@ -542,6 +543,122 @@ function ControlBar({ value, disabled, onChange }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// Policies the system believes control this risk. Reads the
+// `policy_risk_links` table via GET /v1/risks/{id}/policies. The risk
+// endpoint serialises camelCase (policyId, matchScore, …).
+function LinkedPolicies({ riskId }) {
+  const dispatch = useDispatch();
+  const loading = useSelector((s) => s.risks.controllingPoliciesLoading);
+  const linkedRiskId = useSelector(
+    (s) => s.risks.controllingPoliciesRiskId,
+  );
+  const policies = useSelector((s) => s.risks.controllingPolicies);
+  const error = useSelector((s) => s.risks.controllingPoliciesError);
+
+  useEffect(() => {
+    if (riskId != null) dispatch(fetchControllingPolicies(riskId));
+  }, [dispatch, riskId]);
+
+  const ready = linkedRiskId === riskId;
+
+  const shell =
+    "rounded-xl border border-dashed border-cyan-200 bg-cyan-50/60 p-4 ring-1 ring-cyan-200";
+  const headingRow = (
+    <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-900">
+      <FaCircleExclamation className="h-3 w-3" aria-hidden="true" />
+      Linked policies
+    </div>
+  );
+
+  if (!ready || loading) {
+    return (
+      <div className={shell}>
+        {headingRow}
+        <p className="mt-2 flex items-center gap-2 text-[11px] text-cyan-900">
+          <FaSpinner className="h-3 w-3 animate-spin" aria-hidden="true" />
+          Loading policies that control this risk…
+        </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={shell}>
+        {headingRow}
+        <p className="mt-2 flex items-center gap-2 text-[11px] text-rose-700">
+          <FaCircleXmark className="h-3 w-3" aria-hidden="true" />
+          {typeof error === "string"
+            ? error
+            : "Couldn't load linked policies."}
+        </p>
+      </div>
+    );
+  }
+
+  if (policies.length === 0) {
+    return (
+      <div className={shell}>
+        {headingRow}
+        <p className="mt-2 text-[11px] leading-relaxed text-cyan-900">
+          No policy in the library currently enforces this risk's control.
+          Upload a relevant policy and it will be linked automatically.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-cyan-200 bg-white p-4 ring-1 ring-cyan-200">
+      {headingRow}
+      <ul className="mt-3 grid gap-2">
+        {policies.map((p) => (
+          <li key={p.policyId}>
+            <button
+              type="button"
+              onClick={() =>
+                window.location.assign(
+                  `/policy-management?policy=${encodeURIComponent(
+                    p.policyId,
+                  )}`,
+                )
+              }
+              title="Open policy detail"
+              className="w-full rounded-lg border border-slate-100 bg-slate-50/60 p-3 text-left transition hover:border-cyan-300 hover:bg-cyan-50/40"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-2 text-xs font-semibold text-slate-800">
+                    <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600">
+                      {p.code}
+                    </span>
+                    <span className="truncate">{p.title}</span>
+                  </p>
+                  <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-slate-500">
+                    {p.summary ?? "Summary is being generated…"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <span
+                    className="rounded-full bg-cyan-50 px-2 py-0.5 text-[10px] font-medium text-cyan-700 ring-1 ring-cyan-200"
+                    title="Cosine match score"
+                  >
+                    {Math.round((p.matchScore ?? 0) * 100)}% match
+                  </span>
+                  <FaArrowRight
+                    className="h-3 w-3 text-slate-400"
+                    aria-hidden="true"
+                  />
+                </div>
+              </div>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

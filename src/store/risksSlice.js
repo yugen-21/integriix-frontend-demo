@@ -110,6 +110,19 @@ export const searchRisksThunk = createAsyncThunk(
   },
 );
 
+// GET /v1/risks/{id}/policies — policies that control this risk.
+export const fetchControllingPolicies = createAsyncThunk(
+  "risks/fetchControllingPolicies",
+  async (riskId, { rejectWithValue }) => {
+    try {
+      const res = await riskAPI.getControllingPolicies(riskId);
+      return { riskId, items: res.data.items ?? [] };
+    } catch (err) {
+      return rejectWithValue(err?.response?.data?.detail ?? err.message);
+    }
+  },
+);
+
 // ---------- Slice ----------
 
 const initialState = {
@@ -136,6 +149,11 @@ const initialState = {
   searchResults: [],
   searchLoading: false,
   searchError: null,
+  // Policies controlling the currently-open risk (Risk Detail tile).
+  controllingPolicies: [],
+  controllingPoliciesRiskId: null,
+  controllingPoliciesLoading: false,
+  controllingPoliciesError: null,
 };
 
 const risksSlice = createSlice({
@@ -242,6 +260,28 @@ const risksSlice = createSlice({
         state.searchLoading = false;
         state.searchError = action.payload ?? "Search failed";
         state.searchResults = [];
+      })
+      .addCase(fetchControllingPolicies.pending, (state, action) => {
+        const incomingId = action.meta.arg;
+        if (
+          state.controllingPoliciesRiskId != null &&
+          state.controllingPoliciesRiskId !== incomingId
+        ) {
+          state.controllingPolicies = [];
+        }
+        state.controllingPoliciesRiskId = incomingId;
+        state.controllingPoliciesLoading = true;
+        state.controllingPoliciesError = null;
+      })
+      .addCase(fetchControllingPolicies.fulfilled, (state, action) => {
+        state.controllingPoliciesLoading = false;
+        state.controllingPoliciesRiskId = action.payload.riskId;
+        state.controllingPolicies = action.payload.items;
+      })
+      .addCase(fetchControllingPolicies.rejected, (state, action) => {
+        state.controllingPoliciesLoading = false;
+        state.controllingPoliciesError =
+          action.payload ?? "Failed to load linked policies";
       });
   },
 });
